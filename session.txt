@@ -1,0 +1,9 @@
+claude --resume fbe410ce-e7b9-4d2d-ac4a-daabfab4c857  # Integrate local CLI agents into IDE settings
+claude --resume 7c3c2247-750e-4d99-a7fc-bcf0d3284471  # dual-view-cli-gui-switch
+claude --resume bc3aacd8-0e6b-49db-93ce-5fa0e0645331  # Set up Cloud MD dev version with keyboard shortcuts
+claude --resume 90218759-a006-4a84-a710-4b8328332f40  # Review GitHub pull request 599
+claude --resume c8011e3f-e457-4a5e-8364-79acaa3a2936  # Understand GitHub pull request collaboration
+claude --resume 7533a7ca-06ce-42c6-9d01-d581b03bcf8c  # Debug clipboard paste shortcut and AI provider configuration
+claude --resume 517669de-a2cf-4695-9c05-6a53bda7ac02  # Improve UI switching between command line and Cloud Code int
+claude --resume 287d3c47-ccb6-4dfa-8abb-55b044f9625e  # Improve Claude UI rendering and instant response display
+claude --resume 7dbec47d-6c6d-499f-ad25-c0c3dde31000  # Terax-AI v0.8.5 Änderungen überprüfen
