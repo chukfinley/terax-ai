@@ -20,7 +20,9 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import {
   forwardRef,
+  lazy,
   memo,
+  Suspense,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -59,7 +61,13 @@ import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
 
 initVimGlobals();
 import { isMediaPath } from "@/lib/mediaPath";
-import { MediaPreview } from "@/modules/media/MediaPreview";
+// lazy: the media chunk (viewer, video controls) stays out of the initial
+// bundle until a media file is actually opened.
+const MediaPreview = lazy(() =>
+  import("@/modules/media/MediaPreview").then((m) => ({
+    default: m.MediaPreview,
+  })),
+);
 
 export type EditorPaneHandle = {
   setQuery: (q: string) => void;
@@ -630,7 +638,11 @@ const TextEditorPane = memo(
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
   function EditorPane(props, ref) {
     if (isMediaPath(props.path)) {
-      return <MediaPreview ref={ref} path={props.path} />;
+      return (
+        <Suspense fallback={<div className="flex-1 bg-background" />}>
+          <MediaPreview ref={ref} path={props.path} />
+        </Suspense>
+      );
     }
     return <TextEditorPane ref={ref} {...props} />;
   },
