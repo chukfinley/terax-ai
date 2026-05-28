@@ -26,6 +26,8 @@ import {
 import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
 
 initVimGlobals();
+import { isMediaPath } from "@/lib/mediaPath";
+import { MediaPreview } from "@/modules/media/MediaPreview";
 import { resolveLanguage } from "./lib/languageResolver";
 import { useDocument } from "./lib/useDocument";
 import { inlineCompletion } from "./lib/autocomplete/inlineExtension";
@@ -61,7 +63,16 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onClose }, ref) {
+  function EditorPane(props, ref) {
+    if (isMediaPath(props.path)) {
+      return <MediaPreview ref={ref} path={props.path} />;
+    }
+    return <TextEditorPane ref={ref} {...props} />;
+  },
+);
+
+const TextEditorPane = forwardRef<EditorPaneHandle, Props>(
+  function TextEditorPane({ path, onDirtyChange, onSaved, onClose }, ref) {
     const { doc, onChange, save, reload } = useDocument({ path, onDirtyChange });
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
