@@ -58,6 +58,8 @@ import { useEditorThemeExt } from "./lib/useEditorThemeExt";
 import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
 
 initVimGlobals();
+import { isMediaPath } from "@/lib/mediaPath";
+import { MediaPreview } from "@/modules/media/MediaPreview";
 
 export type EditorPaneHandle = {
   setQuery: (q: string) => void;
@@ -102,8 +104,8 @@ function formatBytes(n: number): string {
 
 // memo: EditorStack passes identity-stable props, so background editors
 // skip re-rendering entirely when App re-renders (terminal events, tab churn).
-export const EditorPane = memo(
-  forwardRef<EditorPaneHandle, Props>(function EditorPane(props, ref) {
+const TextEditorPane = memo(
+  forwardRef<EditorPaneHandle, Props>(function TextEditorPane(props, ref) {
     const { path, overrideLanguage, onDirtyChange, onSaved, onClose } = props;
 
     const { doc, onChange, save, reload, adoptDiskText, openAnyway } =
@@ -621,4 +623,15 @@ export const EditorPane = memo(
       </div>
     );
   }),
+);
+
+// Media files bypass CodeMirror entirely: images, video and audio render in
+// MediaPreview, which exposes the same handle so tab plumbing stays uniform.
+export const EditorPane = forwardRef<EditorPaneHandle, Props>(
+  function EditorPane(props, ref) {
+    if (isMediaPath(props.path)) {
+      return <MediaPreview ref={ref} path={props.path} />;
+    }
+    return <TextEditorPane ref={ref} {...props} />;
+  },
 );
