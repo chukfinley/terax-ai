@@ -11,6 +11,8 @@ import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { EDITOR_THEME_EXT } from "./lib/themes";
 import {
   forwardRef,
+  lazy,
+  Suspense,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -27,12 +29,16 @@ import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
 
 initVimGlobals();
 import { isMediaPath } from "@/lib/mediaPath";
-import { MediaPreview } from "@/modules/media/MediaPreview";
 import { resolveLanguage } from "./lib/languageResolver";
 import { useDocument } from "./lib/useDocument";
 import { inlineCompletion } from "./lib/autocomplete/inlineExtension";
 import { getKey } from "@/modules/ai/lib/keyring";
 import { onKeysChanged } from "@/modules/settings/store";
+const MediaPreview = lazy(() =>
+  import("@/modules/media/MediaPreview").then((m) => ({
+    default: m.MediaPreview,
+  }))
+);
 
 export type EditorPaneHandle = {
   setQuery: (q: string) => void;
@@ -65,7 +71,11 @@ function formatBytes(n: number): string {
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
   function EditorPane(props, ref) {
     if (isMediaPath(props.path)) {
-      return <MediaPreview ref={ref} path={props.path} />;
+      return (
+        <Suspense fallback={<div className="flex-1 bg-background" />}>
+          <MediaPreview ref={ref} path={props.path} />
+        </Suspense>
+      );
     }
     return <TextEditorPane ref={ref} {...props} />;
   },
