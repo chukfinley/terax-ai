@@ -3,6 +3,7 @@ pub mod fs;
 pub mod git;
 pub mod history;
 pub mod lsp;
+pub mod media_server;
 pub mod net;
 pub mod proc;
 pub mod pty;

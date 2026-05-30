@@ -1,6 +1,8 @@
 pub mod modules;
 
-use modules::{agent, fs, git, history, lsp, net, pty, secrets, shell, workspace};
+use modules::{
+    agent, fs, git, history, lsp, media_server, net, pty, secrets, shell, workspace,
+};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -253,6 +255,7 @@ pub fn run() {
             fs::file::fs_write_file,
             fs::file::fs_stat,
             fs::file::fs_canonicalize,
+            media_server::media_stream_url,
             fs::mutate::fs_create_file,
             fs::mutate::fs_create_dir,
             fs::mutate::fs_rename,
