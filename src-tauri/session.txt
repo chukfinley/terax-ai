@@ -1,0 +1,1 @@
+claude --resume bc3aacd8-0e6b-49db-93ce-5fa0e0645331  # Set up Cloud MD dev version with keyboard shortcuts

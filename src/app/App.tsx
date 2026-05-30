@@ -95,6 +95,7 @@ import {
   whenSessionReady,
   writeToSession,
 } from "@/modules/terminal";
+import { setTerminalOpenFileHandler } from "@/modules/terminal/lib/useTerminalSession";
 import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import {
@@ -1190,6 +1191,22 @@ export default function App() {
     setLspNavigator({ openFile: openContentHit });
     return () => setLspNavigator(null);
   }, [openContentHit]);
+
+  // Clicking a file path in terminal output opens it in a preview tab,
+  // jumping to the line when the link carried one. Returning false lets the
+  // link layer drop the path from its existence cache.
+  useEffect(() => {
+    setTerminalOpenFileHandler(async (_leafId, path, line) => {
+      if (line !== undefined) {
+        openContentHit(path, line);
+        return true;
+      }
+      return openFileTab(path, false) !== null;
+    });
+    return () => {
+      setTerminalOpenFileHandler(async () => false);
+    };
+  }, [openContentHit, openFileTab]);
 
   const insertHistoryCommand = useMemo(
     () =>

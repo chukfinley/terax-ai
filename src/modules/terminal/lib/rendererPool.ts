@@ -10,6 +10,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { type FontWeight, Terminal } from "@xterm/xterm";
 import { shouldCursorBlink } from "./cursorBlink";
+import { createFileLinkProvider, fileExistenceCache } from "./fileLinkProvider";
 import {
   readTerminalClipboard,
   writeTerminalClipboard,
@@ -30,6 +31,14 @@ export type SlotAdapter = {
   isLeafBusy(leafId: number): boolean;
   isLeafVisible(leafId: number): boolean;
   storeSnapshot(leafId: number, out: SerializeOutput): void;
+  /** Current CWD for the leaf, or null if no OSC 7 was ever received. */
+  getCwd(leafId: number): string | null;
+  /**
+   * Open `path` in the editor pane. `path` may be relative; the adapter
+   * resolves it against `getCwd(leafId)` if so. Returns a promise that
+   * resolves to true on success, false if the file no longer exists.
+   */
+  openFile(leafId: number, path: string, line?: number, col?: number): Promise<boolean>;
 };
 
 export type LeafBridge = {
@@ -243,6 +252,31 @@ function createSlot(): Slot {
     lastH: 0,
     lastUsedAt: 0,
   };
+
+  // The provider closes over `slot.currentLeafId`, which mutates as the slot
+  // rebinds — so a single registration is reused across every leaf this slot
+  // ever hosts. We deliberately drop the disposer: pool slots and their
+  // Terminals live for the entire app lifetime, so the provider never needs
+  // to be unregistered. Pushing onto `slot.oscDisposers` would be wrong —
+  // that array is replaced (not appended-to) on each `bindSlot`, which would
+  // dispose the provider after one leaf and never re-register it.
+  term.registerLinkProvider(
+    createFileLinkProvider(term, {
+      getCwd: () => {
+        const leafId = slot.currentLeafId;
+        if (leafId === null) return null;
+        return adapter?.getCwd(leafId) ?? null;
+      },
+      onClick: (absPath, line, col) => {
+        const leafId = slot.currentLeafId;
+        if (leafId === null) return;
+        void adapter?.openFile(leafId, absPath, line, col).then((ok) => {
+          if (!ok) fileExistenceCache.invalidate(absPath);
+        });
+      },
+      onMissing: (absPath) => fileExistenceCache.invalidate(absPath),
+    }),
+  );
 
   term.attachCustomKeyEventHandler((event) => {
     // During IME composition the browser is assembling a multi-keystroke
