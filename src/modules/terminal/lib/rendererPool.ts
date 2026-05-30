@@ -3,6 +3,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
+import { ImageAddon } from "@xterm/addon-image";
 import { SearchAddon } from "@xterm/addon-search";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -42,6 +43,7 @@ export type Slot = {
   readonly searchAddon: SearchAddon;
   readonly serializeAddon: SerializeAddon;
   readonly host: HTMLDivElement;
+  imageAddon: ImageAddon;
   webglAddon: WebglAddon | null;
   webglCanvases: HTMLCanvasElement[];
   currentLeafId: number | null;
@@ -128,6 +130,13 @@ function createSlot(): Slot {
   term.loadAddon(
     new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)),
   );
+  const imageAddon = new ImageAddon({
+    enableSizeReports: true,
+    sixelSupport: true,
+    iipSupport: true,
+    iipSizeLimit: 50_000_000,
+  });
+  term.loadAddon(imageAddon);
 
   const host = document.createElement("div");
   host.style.cssText = "width:100%;height:100%;";
@@ -142,6 +151,7 @@ function createSlot(): Slot {
     searchAddon,
     serializeAddon,
     host,
+    imageAddon,
     webglAddon: null,
     webglCanvases: [],
     currentLeafId: null,

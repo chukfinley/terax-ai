@@ -6,9 +6,12 @@ use serde::Serialize;
 use tauri::Emitter;
 use tempfile::NamedTempFile;
 
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+
 use crate::modules::workspace::{resolve_path, WorkspaceEnv};
 
 const MAX_READ_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
+const MAX_MEDIA_BYTES: u64 = 100 * 1024 * 1024; // 100 MB
 const BINARY_SNIFF_BYTES: usize = 8 * 1024;
 
 #[derive(Serialize)]
@@ -76,6 +79,47 @@ pub fn fs_read_file(path: String, workspace: Option<WorkspaceEnv>) -> Result<Rea
         Ok(content) => Ok(ReadResult::Text { content, size }),
         Err(_) => Ok(ReadResult::Binary { size }),
     }
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum ReadMediaResult {
+    Ok {
+        data: String,
+        size: u64,
+    },
+    TooLarge {
+        size: u64,
+        limit: u64,
+    },
+}
+
+#[tauri::command]
+pub fn fs_read_media(path: String, workspace: Option<WorkspaceEnv>) -> Result<ReadMediaResult, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let p = resolve_path(&path, &workspace);
+    let meta = std::fs::metadata(&p).map_err(|e| {
+        log::debug!("fs_read_media stat({}) failed: {e}", p.display());
+        e.to_string()
+    })?;
+
+    let size = meta.len();
+    if size > MAX_MEDIA_BYTES {
+        return Ok(ReadMediaResult::TooLarge {
+            size,
+            limit: MAX_MEDIA_BYTES,
+        });
+    }
+
+    let bytes = std::fs::read(&p).map_err(|e| {
+        log::debug!("fs_read_media read({}) failed: {e}", p.display());
+        e.to_string()
+    })?;
+
+    Ok(ReadMediaResult::Ok {
+        data: STANDARD.encode(bytes),
+        size,
+    })
 }
 
 #[derive(Serialize, Clone)]
@@ -164,6 +208,20 @@ pub fn fs_stat(path: String, workspace: Option<WorkspaceEnv>) -> Result<FileStat
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_media_returns_base64_payload() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("pic.png");
+        std::fs::write(&f, [0x89, b'P', b'N', b'G']).unwrap();
+        match fs_read_media(f.to_string_lossy().into_owned(), None).unwrap() {
+            ReadMediaResult::Ok { data, size } => {
+                assert_eq!(size, 4);
+                assert!(!data.is_empty());
+            }
+            _ => panic!("expected ok"),
+        }
+    }
 
     #[test]
     fn read_file_classifies_utf8_as_text() {
