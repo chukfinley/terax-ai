@@ -2,7 +2,7 @@ pub mod modules;
 
 use modules::{
     agent, claude_usage, clipboard, fs, git, history, lsp, media_server, net, pty,
-    secrets, shell, workspace,
+    secrets, shell, tmux_config, workspace,
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -259,6 +259,7 @@ pub fn run() {
             media_server::media_stream_url,
             claude_usage::claude_usage,
             fs::file::fs_exists,
+            tmux_config::tmux_split_bindings,
             fs::mutate::fs_create_file,
             fs::mutate::fs_create_dir,
             fs::mutate::fs_rename,
