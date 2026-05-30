@@ -805,11 +805,22 @@ export default function App() {
       }, 0);
     };
 
+    // Any keyboard action (copy, paste, typing, navigation) dismisses the
+    // mouse-selection popup. It only auto-closed on mouse events before, so
+    // keyboard-only users were left with a stale "Ask Terax" button.
+    const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta"]);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (MODIFIER_KEYS.has(e.key)) return;
+      setAskPopup(null);
+    };
+
     document.addEventListener("mousedown", onDown);
     document.addEventListener("mouseup", onUp);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [captureActiveSelection]);
 
