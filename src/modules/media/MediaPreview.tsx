@@ -2,6 +2,7 @@ import { getMediaKind, mimeForMediaKind } from "@/lib/mediaPath";
 import { resolveMediaUrl } from "@/lib/mediaSrc";
 import { createMediaEditorHandle } from "@/modules/editor/mediaEditorHandle";
 import { ImageViewer } from "@/modules/media/ImageViewer";
+import { VideoPlayer } from "@/modules/media/VideoPlayer";
 import type { EditorPaneHandle } from "@/modules/editor/types";
 import {
   forwardRef,
@@ -103,14 +104,7 @@ export const MediaPreview = forwardRef<EditorPaneHandle, Props>(
           {mediaKind === "image" ? (
             <ImageViewer src={status.src} />
           ) : mediaKind === "video" ? (
-            <video
-              controls
-              playsInline
-              preload="metadata"
-              className="max-h-full max-w-full object-contain block"
-            >
-              <source src={status.src} type={mime} />
-            </video>
+            <VideoPlayer src={status.src} mime={mime} />
           ) : (
             <div className="w-full max-w-md">
               <audio src={status.src} controls className="w-full">
