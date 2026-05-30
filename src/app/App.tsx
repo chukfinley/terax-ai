@@ -83,6 +83,7 @@ import { saveSession } from "@/modules/tabs/lib/sessionPersistence";
 import { serializeSession } from "@/modules/tabs/lib/sessionSerialize";
 import { DEFAULT_SPACE_ID } from "@/modules/tabs/lib/useTabs";
 import {
+  cleanupTempClipboardImages,
   clearFocusedTerminal,
   disposeSession,
   findLeafCwd,
@@ -259,6 +260,12 @@ export default function App() {
     activeSpaceId: activeSpaceId ?? DEFAULT_SPACE_ID,
     enabled: spacesHydrated,
   });
+
+  // Image-paste temp files accumulate in $TMPDIR; clear anything older than
+  // 24h on startup. Fire-and-forget — failure is non-fatal.
+  useEffect(() => {
+    void cleanupTempClipboardImages();
+  }, []);
 
   const prevSpaceRef = useRef(activeSpaceId);
   useEffect(() => {

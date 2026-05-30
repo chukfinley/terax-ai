@@ -1,4 +1,5 @@
 import { resolveFontFamily } from "@/lib/fonts";
+import { quoteShellArg } from "@/lib/shellQuote";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -11,6 +12,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { type FontWeight, Terminal } from "@xterm/xterm";
 import { shouldCursorBlink } from "./cursorBlink";
 import { createFileLinkProvider, fileExistenceCache } from "./fileLinkProvider";
+import { readClipboardImagePath } from "./imagePaste";
 import {
   readTerminalClipboard,
   writeTerminalClipboard,
@@ -315,12 +317,7 @@ function createSlot(): Slot {
       return false;
     }
     if (isTerminalPaste(event)) {
-      if (event.type === "keydown") {
-        const targetLeafId = slot.currentLeafId;
-        void readTerminalClipboard().then((text) => {
-          if (text && slot.currentLeafId === targetLeafId) slot.term.paste(text);
-        });
-      }
+      if (event.type === "keydown") void handleTerminalPaste(slot);
       event.preventDefault();
       return false;
     }
@@ -1084,14 +1081,27 @@ function isTerminalCopy(e: KeyboardEvent): boolean {
 }
 
 function isTerminalPaste(e: KeyboardEvent): boolean {
-  return (
-    !IS_MAC &&
-    e.ctrlKey &&
-    e.shiftKey &&
-    !e.altKey &&
-    !e.metaKey &&
-    (e.code === "KeyV" || e.key === "v" || e.key === "V")
-  );
+  const isV = e.code === "KeyV" || e.key === "v" || e.key === "V";
+  if (!isV) return false;
+  if (IS_MAC) {
+    return e.metaKey && !e.altKey && !e.ctrlKey;
+  }
+  // Windows/Linux: cover both Ctrl+V and Ctrl+Shift+V so image paste lands
+  // on the binding users actually press. Plain Ctrl+V loses its quoted-insert
+  // (^V) behavior here, which is the documented tradeoff for AI-terminal use.
+  return e.ctrlKey && !e.altKey && !e.metaKey;
+}
+
+async function handleTerminalPaste(slot: Slot): Promise<void> {
+  const targetLeafId = slot.currentLeafId;
+  const imagePath = await readClipboardImagePath();
+  if (slot.currentLeafId !== targetLeafId) return;
+  if (imagePath) {
+    slot.term.paste(quoteShellArg(imagePath));
+    return;
+  }
+  const text = await readTerminalClipboard();
+  if (text && slot.currentLeafId === targetLeafId) slot.term.paste(text);
 }
 
 function isShiftEnter(e: KeyboardEvent): boolean {

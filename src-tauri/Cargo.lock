@@ -76,6 +76,29 @@ dependencies = [
 [[package]]
 name = "arboard"
 version = "3.6.1"
+<<<<<<< HEAD
+=======
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0348a1c054491f4bfe6ab86a7b6ab1e44e45d899005de92f58b3df180b36ddaf"
+dependencies = [
+ "clipboard-win",
+ "image",
+ "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-foundation",
+ "parking_lot",
+ "percent-encoding",
+ "windows-sys 0.60.2",
+ "x11rb",
+]
+
+[[package]]
+name = "arrayvec"
+version = "0.7.6"
+>>>>>>> 8667d8f (feat(terminal): clipboard image paste + copy-on-select (upstream #506))
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0348a1c054491f4bfe6ab86a7b6ab1e44e45d899005de92f58b3df180b36ddaf"
 dependencies = [
@@ -397,6 +420,15 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 [[package]]
 name = "byteorder-lite"
 version = "0.1.0"
+<<<<<<< HEAD
+=======
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
+
+[[package]]
+name = "bytes"
+version = "1.11.1"
+>>>>>>> 8667d8f (feat(terminal): clipboard image paste + copy-on-select (upstream #506))
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
 
@@ -2616,6 +2648,19 @@ dependencies = [
 [[package]]
 name = "moxcms"
 version = "0.8.1"
+<<<<<<< HEAD
+=======
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b"
+dependencies = [
+ "num-traits",
+ "pxfm",
+]
+
+[[package]]
+name = "muda"
+version = "0.17.2"
+>>>>>>> 8667d8f (feat(terminal): clipboard image paste + copy-on-select (upstream #506))
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b"
 dependencies = [
@@ -2638,7 +2683,11 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-foundation",
  "once_cell",
+<<<<<<< HEAD
  "png 0.18.1",
+=======
+ "png 0.17.16",
+>>>>>>> 8667d8f (feat(terminal): clipboard image paste + copy-on-select (upstream #506))
  "serde",
  "thiserror 2.0.18",
  "windows-sys 0.61.2",
@@ -3578,6 +3627,12 @@ dependencies = [
  "tempfile",
  "unarray",
 ]
+
+[[package]]
+name = "pxfm"
+version = "0.1.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0c5ccf5294c6ccd63a74f1565028353830a9c2f5eb0c682c355c471726a6e3f"
 
 [[package]]
 name = "pxfm"
@@ -5321,6 +5376,7 @@ dependencies = [
 name = "terax"
 version = "0.8.5"
 dependencies = [
+ "arboard",
  "base64 0.22.1",
  "bytes",
  "dirs 6.0.0",
@@ -5334,9 +5390,13 @@ dependencies = [
  "libc",
  "log",
  "notify",
+<<<<<<< HEAD
  "nucleo-matcher",
  "objc2",
  "objc2-foundation",
+=======
+ "png 0.17.16",
+>>>>>>> 8667d8f (feat(terminal): clipboard image paste + copy-on-select (upstream #506))
  "portable-pty",
  "proptest",
  "reqwest 0.12.28",
@@ -5719,7 +5779,11 @@ dependencies = [
  "objc2-core-graphics",
  "objc2-foundation",
  "once_cell",
+<<<<<<< HEAD
  "png 0.18.1",
+=======
+ "png 0.17.16",
+>>>>>>> 8667d8f (feat(terminal): clipboard image paste + copy-on-select (upstream #506))
  "serde",
  "thiserror 2.0.18",
  "windows-sys 0.61.2",
@@ -6297,6 +6361,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
 
 [[package]]
+<<<<<<< HEAD
 name = "which"
 version = "8.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6306,6 +6371,8 @@ dependencies = [
 ]
 
 [[package]]
+=======
+>>>>>>> 8667d8f (feat(terminal): clipboard image paste + copy-on-select (upstream #506))
 name = "winapi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"

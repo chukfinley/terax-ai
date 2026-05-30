@@ -1,8 +1,8 @@
 pub mod modules;
 
 use modules::{
-    agent, claude_usage, fs, git, history, lsp, media_server, net, pty, secrets, shell,
-    workspace,
+    agent, claude_usage, clipboard, fs, git, history, lsp, media_server, net, pty,
+    secrets, shell, workspace,
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -325,6 +325,8 @@ pub fn run() {
             history::history_commands,
             history::history_record,
             history::history_list,
+            clipboard::clipboard_read_image,
+            clipboard::clipboard_cleanup_temp_images,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -49,6 +49,8 @@ tempfile = "3"
 notify = "8.2.0"
 which = "8.0.4"
 base64 = "0.22"
+arboard = { version = "3.4", features = ["image-data"] }
+png = "0.17"
 
 [dev-dependencies]
 proptest = "1"
