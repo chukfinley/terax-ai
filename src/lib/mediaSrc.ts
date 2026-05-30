@@ -53,12 +53,21 @@ export async function resolveMediaUrl(
   path: string,
   kind: MediaKind,
 ): Promise<MediaUrlResult> {
-  // Video and audio stream through the asset protocol (HTTP range requests):
-  // playback starts before the file is fully read, seeking works, and there is
-  // no in-memory size cap — essential for large files like .mkv. Images keep
-  // the authenticated IPC read so they load on any path/drive.
+  // Video and audio stream from a localhost HTTP endpoint with byte-range
+  // support: playback starts before the file is fully read, seeking works, and
+  // there is no in-memory size cap — essential for large files like .mkv. This
+  // also avoids the WebKitGTK media backend, which cannot decode files served
+  // through the asset:// scheme on Linux. Images keep the authenticated IPC
+  // read so they load on any path/drive.
   if (kind === "video" || kind === "audio") {
-    return assetUrl(path);
+    const [src, stat] = await Promise.all([
+      invoke<string>("media_stream_url", {
+        path,
+        workspace: currentWorkspaceEnv(),
+      }),
+      invoke<FileStat>("fs_stat", { path, workspace: currentWorkspaceEnv() }),
+    ]);
+    return { src, size: stat.size };
   }
 
   const mime = mimeForMediaKind(kind, path);
