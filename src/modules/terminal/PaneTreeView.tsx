@@ -23,6 +23,8 @@ type Props = {
   blocks: boolean;
   onFocusLeaf: (leafId: number) => void;
   getBundle: (leafId: number) => LeafBundle;
+  /** Called when the user finishes resizing a split. */
+  onResizeSplit: (splitId: number, sizes: number[]) => void;
 };
 
 export function PaneTreeView(props: Props) {
@@ -63,13 +65,33 @@ export function PaneTreeView(props: Props) {
   return (
     <ResizablePanelGroup
       orientation={node.dir === "row" ? "horizontal" : "vertical"}
+      onLayoutChanged={(layout) => {
+        // If any panel is missing from the layout map (e.g. the group hasn't
+        // settled yet), bail rather than corrupting the stored sizes — a zero
+        // entry would render the pane at 0% on next restore.
+        const raw = node.children.map(
+          (child) => layout[`pane-slot-${firstLeafSlotId(child)}`],
+        );
+        if (raw.some((v) => typeof v !== "number")) return;
+        const nums = raw as number[];
+        const total = nums.reduce((s, v) => s + v, 0);
+        if (total <= 0) return;
+        const normalized = nums.map((v) => (v / total) * 100);
+        props.onResizeSplit(node.id, normalized);
+      }}
     >
       {node.children.map((child, i) => {
         const slotId = firstLeafSlotId(child);
+        // defaultSize replays the persisted split ratios from the saved session.
+        const size = node.sizes?.[i];
         return (
           <Fragment key={slotId}>
             {i > 0 && <ResizableHandle />}
-            <ResizablePanel id={`pane-slot-${slotId}`} minSize="10%">
+            <ResizablePanel
+              id={`pane-slot-${slotId}`}
+              minSize="10%"
+              defaultSize={size !== undefined ? `${size}%` : undefined}
+            >
               <PaneTreeView {...props} node={child} />
             </ResizablePanel>
           </Fragment>

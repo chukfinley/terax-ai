@@ -71,12 +71,16 @@ import {
 } from "@/modules/spaces";
 import { StatusBar } from "@/modules/statusbar";
 import {
+  sessionKey,
   TabSwitcherHud,
+  useSessionLoad,
   useTabSwitcher,
   useTabs,
   useWindowTitle,
   useWorkspaceCwd,
 } from "@/modules/tabs";
+import { saveSession } from "@/modules/tabs/lib/sessionPersistence";
+import { serializeSession } from "@/modules/tabs/lib/sessionSerialize";
 import { DEFAULT_SPACE_ID } from "@/modules/tabs/lib/useTabs";
 import {
   clearFocusedTerminal,
@@ -93,7 +97,11 @@ import {
 } from "@/modules/terminal";
 import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
-import { useWorkspaceEnvStore, type WorkspaceEnv } from "@/modules/workspace";
+import {
+  useWorkspaceEnvStore,
+  workspaceScopeKey,
+  type WorkspaceEnv,
+} from "@/modules/workspace";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -110,6 +118,10 @@ import { useTabCloseGuards } from "./hooks/useTabCloseGuards";
 import { useWorkspaceSwitcher } from "./hooks/useWorkspaceSwitcher";
 
 export default function App() {
+  // Resolves the saved session before the first tab render, so the default
+  // tab never clobbers a restored payload.
+  const sessionLoad = useSessionLoad(getLaunchDir() ?? undefined);
+
   const {
     tabs,
     activeId,
@@ -150,7 +162,14 @@ export default function App() {
     closeActivePane,
     closePaneByLeaf,
     resetWorkspace,
-  } = useTabs(getLaunchDir() ? { cwd: getLaunchDir() } : undefined);
+    restoredApplied,
+  } = useTabs(
+    sessionLoad.kind !== "ready"
+      ? undefined
+      : sessionLoad.restored
+        ? { restored: sessionLoad.restored }
+        : { cwd: getLaunchDir() ?? undefined },
+  );
 
   // Mirror `tabs` into a ref so callbacks scheduled with `setTimeout`
   // (e.g. cdInNewTab) read the latest pane state instead of a stale closure.
@@ -1194,6 +1213,31 @@ export default function App() {
     newAgentTab,
     terminalRefs,
   });
+
+  const restoreSessionPref = usePreferencesStore((s) => s.restoreSession);
+  const sessionStorageKey = useMemo(
+    () =>
+      sessionLoad.kind === "ready"
+        ? sessionKey(getLaunchDir() ?? undefined, workspaceScopeKey(workspaceEnv))
+        : null,
+    [sessionLoad.kind, workspaceEnv],
+  );
+
+  // Debounced autosave. Gated on restoredApplied so the empty default tab
+  // set can't overwrite a saved session before the restore lands.
+  useEffect(() => {
+    if (!restoreSessionPref) return;
+    if (!sessionStorageKey) return;
+    if (!restoredApplied) return;
+    const t = setTimeout(() => {
+      void saveSession(sessionStorageKey, serializeSession(tabs, activeId));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [tabs, activeId, sessionStorageKey, restoreSessionPref, restoredApplied]);
+
+  // Gate first paint until the session load resolves AND useTabs applied the
+  // restored payload — otherwise the default tab flashes for one frame.
+  if (sessionLoad.kind === "loading" || !restoredApplied) return null;
 
   const shell = (
     <ThemeProvider>

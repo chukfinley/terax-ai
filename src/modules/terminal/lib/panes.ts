@@ -17,6 +17,12 @@ export type PaneNode =
       id: PaneId;
       dir: SplitDir;
       children: PaneNode[];
+      /**
+       * Per-child sizes (percent, sums to ~100). Captured by `onLayoutChanged`
+       * after a resize drag, replayed via `defaultSize` on next mount.
+       * Omitted means equal-share layout (the library's default).
+       */
+      sizes?: number[];
     };
 
 export function isLeaf(
@@ -90,6 +96,7 @@ export function splitLeaf(
           newLeaf,
           ...tree.children.slice(idx + 1),
         ],
+        sizes: undefined,
       };
     }
   }
@@ -127,7 +134,7 @@ export function removeLeaf(
   }
   if (newChildren.length === 0) return null;
   if (newChildren.length === 1) return newChildren[0];
-  return { ...tree, children: newChildren };
+  return { ...tree, children: newChildren, sizes: undefined };
 }
 
 export function nextLeafId(
@@ -286,4 +293,36 @@ export function swapLeafInDirection(
   const first = findLeaf(tree, activeId);
   const second = findLeaf(tree, targetId);
   return first && second ? swapLeaves(tree, first, second) : tree;
+}
+
+/**
+ * Set `sizes` on the split with the given id. Returns a new tree (or the
+ * original reference if the split was not found or the sizes were already
+ * equal). Walks the tree rather than indexing because the renderer reports
+ * sizes by split id, not by position.
+ */
+export function setSplitSizes(
+  tree: PaneNode,
+  splitId: PaneId,
+  sizes: number[],
+): PaneNode {
+  if (isLeaf(tree)) return tree;
+  if (tree.id === splitId) {
+    // Skip the update if nothing changed (avoids spurious re-renders).
+    if (
+      tree.sizes &&
+      tree.sizes.length === sizes.length &&
+      tree.sizes.every((v, i) => v === sizes[i])
+    ) {
+      return tree;
+    }
+    return { ...tree, sizes };
+  }
+  let changed = false;
+  const next = tree.children.map((c) => {
+    const u = setSplitSizes(c, splitId, sizes);
+    if (u !== c) changed = true;
+    return u;
+  });
+  return changed ? { ...tree, children: next } : tree;
 }

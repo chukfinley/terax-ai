@@ -129,6 +129,7 @@ export type Preferences = {
   customInstructions: string;
   autostart: boolean;
   restoreWindowState: boolean;
+  restoreSession: boolean;
   autocompleteEnabled: boolean;
   autocompleteTrigger: AutocompleteTrigger;
   autocompleteProvider: AutocompleteProviderId;
@@ -218,6 +219,7 @@ const KEY_AUTOSTART = "autostart";
 const KEY_RESTORE_WINDOW = "restoreWindowState";
 export type AutocompleteTrigger = "auto" | "manual";
 
+const KEY_RESTORE_SESSION = "restoreSession";
 const KEY_AUTOCOMPLETE_ENABLED = "autocompleteEnabled";
 const KEY_AUTOCOMPLETE_TRIGGER = "autocompleteTrigger";
 const KEY_AUTOCOMPLETE_PROVIDER = "autocompleteProvider";
@@ -301,6 +303,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   customInstructions: "",
   autostart: false,
   restoreWindowState: true,
+  restoreSession: true,
   autocompleteEnabled: false,
   autocompleteTrigger: "auto",
   autocompleteProvider: "cerebras",
@@ -405,6 +408,9 @@ export async function loadPreferences(): Promise<Preferences> {
     restoreWindowState:
       get<boolean>(KEY_RESTORE_WINDOW) ??
       DEFAULT_PREFERENCES.restoreWindowState,
+    restoreSession:
+      get<boolean>(KEY_RESTORE_SESSION) ??
+      DEFAULT_PREFERENCES.restoreSession,
     autocompleteEnabled:
       get<boolean>(KEY_AUTOCOMPLETE_ENABLED) ??
       DEFAULT_PREFERENCES.autocompleteEnabled,
@@ -635,6 +641,10 @@ export async function setAutocompleteTrigger(
   value: AutocompleteTrigger,
 ): Promise<void> {
   await writePref(KEY_AUTOCOMPLETE_TRIGGER, value);
+}
+
+export async function setRestoreSession(value: boolean): Promise<void> {
+  await writePref(KEY_RESTORE_SESSION, value);
 }
 
 export async function setAutocompleteEnabled(value: boolean): Promise<void> {
@@ -889,6 +899,7 @@ export async function onPreferencesChange(
     [KEY_CUSTOM_INSTRUCTIONS]: "customInstructions",
     [KEY_AUTOSTART]: "autostart",
     [KEY_RESTORE_WINDOW]: "restoreWindowState",
+    [KEY_RESTORE_SESSION]: "restoreSession",
     [KEY_AUTOCOMPLETE_ENABLED]: "autocompleteEnabled",
     [KEY_AUTOCOMPLETE_TRIGGER]: "autocompleteTrigger",
     [KEY_AUTOCOMPLETE_PROVIDER]: "autocompleteProvider",

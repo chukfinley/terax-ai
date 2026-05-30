@@ -21,6 +21,7 @@ import {
   setAutostart,
   setDefaultWorkspaceEnv,
   setExplorerGitDecorations,
+  setRestoreSession,
   setRestoreWindowState,
   setShowHidden,
   setTerminalCursorBlink,
@@ -77,6 +78,7 @@ export function GeneralSection() {
 
   const autostart = usePreferencesStore((s) => s.autostart);
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
+  const restoreSession = usePreferencesStore((s) => s.restoreSession);
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const explorerGitDecorations = usePreferencesStore(
     (s) => s.explorerGitDecorations,
@@ -459,6 +461,15 @@ export function GeneralSection() {
             <Switch
               checked={restoreWindowState}
               onCheckedChange={(v) => void setRestoreWindowState(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Restore previous session"
+            description="Reopens your tabs and terminal panes from the last session. Saved per project directory and environment."
+          >
+            <Switch
+              checked={restoreSession}
+              onCheckedChange={(v) => void setRestoreSession(v)}
             />
           </SettingRow>
         </div>

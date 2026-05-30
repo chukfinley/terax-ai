@@ -3,6 +3,7 @@ import {
   createAgentPanePlan,
   type AgentInstanceCount,
 } from "@/modules/agents/lib/launcher";
+import type { RestoredInitial } from "./sessionDeserialize";
 import {
   findLeafCwd,
   hasLeaf,
@@ -14,6 +15,7 @@ import {
   removeLeaf,
   type SplitDir,
   setLeafCwd as setLeafCwdInTree,
+  setSplitSizes as setSplitSizesInTree,
   siblingLeafOf,
   splitLeaf,
   swapLeafInDirection,
@@ -323,28 +325,71 @@ export function planSpaceRemoval(
   return { tabs: next, disposeLeafIds, activeId };
 }
 
-export function useTabs(initial?: Partial<TerminalTab>) {
+export type UseTabsInitial =
+  | (Partial<TerminalTab> & { restored?: undefined })
+  | { restored: RestoredInitial };
+
+export function useTabs(initial?: UseTabsInitial) {
+  const restored =
+    initial && "restored" in initial ? initial.restored : undefined;
+
   const [tabs, setTabs] = useState<Tab[]>(() => {
+    if (restored && restored.tabs.length > 0) return restored.tabs;
     const tabId = 1;
     const leafId = 2;
+    const defaultCwd =
+      initial && "restored" in initial ? undefined : initial?.cwd;
+    const defaultTitle =
+      initial && "restored" in initial ? "shell" : (initial?.title ?? "shell");
     return [
       {
         id: tabId,
         kind: "terminal",
         spaceId: DEFAULT_SPACE_ID,
         cold: true,
-        title: initial?.title ?? "shell",
-        cwd: initial?.cwd,
-        paneTree: { kind: "leaf", id: leafId, cwd: initial?.cwd },
+        title: defaultTitle,
+        cwd: defaultCwd,
+        paneTree: { kind: "leaf", id: leafId, cwd: defaultCwd },
         activeLeafId: leafId,
       },
     ];
   });
-  const [activeId, setActiveId] = useState(1);
+  const [activeId, setActiveId] = useState<number>(() =>
+    restored && restored.tabs.length > 0 ? restored.activeId : 1,
+  );
   // Gates warming until boot resolves the restore, so no shell spawns before it.
   const [booted, setBooted] = useState(false);
-  const nextIdRef = useRef(3);
+  const nextIdRef = useRef<number>(
+    restored && restored.tabs.length > 0 ? restored.nextId : 3,
+  );
   const activeSpaceIdRef = useRef(DEFAULT_SPACE_ID);
+
+  // One-shot late-restore. When useTabs is mounted before the session loader
+  // resolves (App gates the first render on `sessionLoad.kind === "ready"`,
+  // but the component instance persists across the gate), the initial useState
+  // above used the default-tab path because `initial.restored` was undefined
+  // at mount time. When the loader resolves and a non-empty restored payload
+  // arrives, apply it here. Also marks applied for the "no payload" case so
+  // the App gate lifts immediately when restoreSession is OFF or the saved
+  // session was empty.
+  const [restoredApplied, setRestoredApplied] = useState(false);
+  useEffect(() => {
+    if (restoredApplied) return;
+    if (initial === undefined) return; // still loading
+    // initial is defined; one of the "ready" states.
+    if (
+      "restored" in initial &&
+      initial.restored &&
+      initial.restored.tabs.length > 0
+    ) {
+      const r = initial.restored;
+      setTabs(r.tabs);
+      setActiveId(r.activeId);
+      nextIdRef.current = r.nextId;
+    }
+    setRestoredApplied(true);
+  }, [initial, restoredApplied]);
+
   const tabsRef = useRef(tabs);
   const activeIdRef = useRef(activeId);
 
@@ -1060,6 +1105,20 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     });
   }, []);
 
+  const setSplitSizes = useCallback(
+    (tabId: number, splitId: number, sizes: number[]) => {
+      setTabs((curr) =>
+        curr.map((t) => {
+          if (t.kind !== "terminal" || t.id !== tabId) return t;
+          const paneTree = setSplitSizesInTree(t.paneTree, splitId, sizes);
+          if (paneTree === t.paneTree) return t;
+          return { ...t, paneTree };
+        }),
+      );
+    },
+    [],
+  );
+
   const focusPane = useCallback((tabId: number, leafId: number) => {
     setTabs((curr) =>
       curr.map((t) => {
@@ -1238,6 +1297,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     markBooted,
     setActiveSpaceForNewTabs,
     setOverrideLanguage,
+    restoredApplied,
     newTab,
     newBlockTab,
     newAgentTab,
@@ -1258,6 +1318,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     updateTab,
     selectByIndex,
     setLeafCwd,
+    setSplitSizes,
     focusPane,
     focusNextPaneInTab,
     swapActivePaneInDirection,
