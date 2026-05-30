@@ -445,6 +445,12 @@ export const FileExplorer = memo(
           else onOpenFile(row.path);
           break;
         }
+        case "F2": {
+          if (currentIdx < 0) return;
+          e.preventDefault();
+          tree.beginRename(entryPaths[currentIdx]);
+          break;
+        }
       }
     };
 
@@ -742,6 +748,12 @@ export const FileExplorer = memo(
                     Attach to Agent
                   </ContextMenuItem>
                   <ContextMenuSeparator />
+                  <ContextMenuItem
+                    className={COMPACT_ITEM}
+                    onSelect={() => tree.beginRename(menuTarget.path)}
+                  >
+                    Rename
+                  </ContextMenuItem>
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     variant="destructive"
