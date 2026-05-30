@@ -114,13 +114,20 @@ export const SHORTCUTS: Shortcut[] = [
     id: "pane.splitRight",
     label: "Split pane right",
     group: "Panes",
-    defaultBindings: [{ [MOD_PROP]: true, key: "d" }],
+    // On Linux/Windows plain Ctrl+D is the terminal's EOF (exit). Never steal
+    // it — require Shift so Ctrl+D still reaches the shell. macOS Cmd+D has no
+    // EOF clash, so keep the iTerm-standard chord there.
+    defaultBindings: IS_MAC
+      ? [{ meta: true, key: "d" }]
+      : [{ ctrl: true, shift: true, key: "d" }],
   },
   {
     id: "pane.splitDown",
     label: "Split pane down",
     group: "Panes",
-    defaultBindings: [{ [MOD_PROP]: true, shift: true, key: "d" }],
+    defaultBindings: IS_MAC
+      ? [{ meta: true, shift: true, key: "d" }]
+      : [{ ctrl: true, shift: true, key: "s" }],
   },
   {
     id: "pane.focusNext",
