@@ -1,6 +1,7 @@
 import { getMediaKind, mimeForMediaKind } from "@/lib/mediaPath";
 import { resolveMediaUrl } from "@/lib/mediaSrc";
 import { createMediaEditorHandle } from "@/modules/editor/mediaEditorHandle";
+import { ImageViewer } from "@/modules/media/ImageViewer";
 import type { EditorPaneHandle } from "@/modules/editor/types";
 import {
   forwardRef,
@@ -100,18 +101,13 @@ export const MediaPreview = forwardRef<EditorPaneHandle, Props>(
         </div>
         <div className="relative min-h-0 flex-1 overflow-hidden bg-muted/20 p-4 flex items-center justify-center">
           {mediaKind === "image" ? (
-            <img
-              src={status.src}
-              alt=""
-              className="max-h-full max-w-full object-contain select-none block"
-              draggable={false}
-            />
+            <ImageViewer src={status.src} />
           ) : mediaKind === "video" ? (
             <video
-              src={status.src}
               controls
               playsInline
-                className="max-h-full max-w-full object-contain block"
+              preload="metadata"
+              className="max-h-full max-w-full object-contain block"
             >
               <source src={status.src} type={mime} />
             </video>

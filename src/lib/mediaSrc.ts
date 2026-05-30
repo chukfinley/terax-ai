@@ -35,20 +35,7 @@ function blobUrl(bytes: Uint8Array, mime: string, size: number): MediaUrlResult 
  * Load media through workspace-authenticated IPC (works on any drive/path).
  * Falls back to `convertFileSrc` only when the file exceeds the IPC size cap.
  */
-export async function resolveMediaUrl(
-  path: string,
-  kind: MediaKind,
-): Promise<MediaUrlResult> {
-  const mime = mimeForMediaKind(kind, path);
-  const res = await invoke<ReadMediaResult>("fs_read_media", {
-    path,
-    workspace: currentWorkspaceEnv(),
-  });
-
-  if (res.kind === "ok") {
-    return blobUrl(bytesFromBase64(res.data), mime, res.size);
-  }
-
+async function assetUrl(path: string): Promise<MediaUrlResult> {
   const [canon, stat] = await Promise.all([
     invoke<string>("fs_canonicalize", {
       path,
@@ -60,4 +47,29 @@ export async function resolveMediaUrl(
     }),
   ]);
   return { src: convertFileSrc(canon), size: stat.size };
+}
+
+export async function resolveMediaUrl(
+  path: string,
+  kind: MediaKind,
+): Promise<MediaUrlResult> {
+  // Video and audio stream through the asset protocol (HTTP range requests):
+  // playback starts before the file is fully read, seeking works, and there is
+  // no in-memory size cap — essential for large files like .mkv. Images keep
+  // the authenticated IPC read so they load on any path/drive.
+  if (kind === "video" || kind === "audio") {
+    return assetUrl(path);
+  }
+
+  const mime = mimeForMediaKind(kind, path);
+  const res = await invoke<ReadMediaResult>("fs_read_media", {
+    path,
+    workspace: currentWorkspaceEnv(),
+  });
+
+  if (res.kind === "ok") {
+    return blobUrl(bytesFromBase64(res.data), mime, res.size);
+  }
+
+  return assetUrl(path);
 }
