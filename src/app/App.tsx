@@ -93,6 +93,7 @@ import {
   writeToSession,
   type TerminalPaneHandle,
 } from "@/modules/terminal";
+import { setTerminalOpenFileHandler } from "@/modules/terminal/lib/useTerminalSession";
 import { ThemeProvider } from "@/modules/theme";
 import { listCustomThemes, saveCustomTheme } from "@/modules/theme/customThemes";
 import {
@@ -205,6 +206,7 @@ export default function App() {
     newAgentTab,
     newPrivateTab,
     openFileTab,
+    clearPendingSelection,
     pinTab,
     newPreviewTab,
     newMarkdownTab,
@@ -671,6 +673,20 @@ export default function App() {
     return () => {
       alive = false;
       unsub?.();
+    };
+  }, [openFileTab]);
+
+  useEffect(() => {
+    setTerminalOpenFileHandler(async (_leafId, path, line, col) => {
+      const id = openFileTab(
+        path,
+        false, // preview slot — VSCode-style
+        line !== undefined ? { line, col } : undefined,
+      );
+      return id !== null;
+    });
+    return () => {
+      setTerminalOpenFileHandler(async () => false);
     };
   }, [openFileTab]);
 
@@ -1462,6 +1478,7 @@ export default function App() {
           registerHandle={registerEditorHandle}
           onDirtyChange={handleEditorDirty}
           onCloseTab={disposeTab}
+          onSelectionApplied={clearPendingSelection}
         />
       </div>
       <div

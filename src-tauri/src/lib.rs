@@ -139,6 +139,7 @@ pub fn run() {
             fs::file::fs_canonicalize,
             media_server::media_stream_url,
             claude_usage::claude_usage,
+            fs::file::fs_exists,
             fs::mutate::fs_create_file,
             fs::mutate::fs_create_dir,
             fs::mutate::fs_rename,
