@@ -1,7 +1,8 @@
 pub mod modules;
 
 use modules::{
-    agent, fs, git, history, lsp, media_server, net, pty, secrets, shell, workspace,
+    agent, claude_usage, fs, git, history, lsp, media_server, net, pty, secrets, shell,
+    workspace,
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -256,6 +257,7 @@ pub fn run() {
             fs::file::fs_stat,
             fs::file::fs_canonicalize,
             media_server::media_stream_url,
+            claude_usage::claude_usage,
             fs::mutate::fs_create_file,
             fs::mutate::fs_create_dir,
             fs::mutate::fs_rename,

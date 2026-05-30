@@ -18,6 +18,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ClaudeUsage } from "./ClaudeUsage";
 import {
   SearchInline,
   type SearchInlineHandle,
@@ -172,6 +173,8 @@ export function Header({
         />
         <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
       </div>
+
+      <ClaudeUsage />
 
       <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
 
