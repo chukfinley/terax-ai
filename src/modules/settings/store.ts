@@ -130,6 +130,12 @@ export type Preferences = {
   autostart: boolean;
   restoreWindowState: boolean;
   restoreSession: boolean;
+  /**
+   * tmux-style prefix keybindings for pane splitting. `null` = "auto": follow
+   * the backend's `enabled` (whether a ~/.tmux.conf was found). `true`/`false`
+   * = explicit user override.
+   */
+  tmuxSplitKeys: boolean | null;
   autocompleteEnabled: boolean;
   autocompleteTrigger: AutocompleteTrigger;
   autocompleteProvider: AutocompleteProviderId;
@@ -267,6 +273,7 @@ const KEY_EDITOR_FORMATTER_BY_LANG = "editorFormatterByLang";
 const KEY_EDITOR_CUSTOM_FORMAT_COMMAND = "editorCustomFormatCommand";
 const KEY_LSP_ACTIVATION = "lspActivation";
 const KEY_LSP_CUSTOM_SERVERS = "lspCustomServers";
+const KEY_TMUX_SPLIT_KEYS = "tmuxSplitKeys";
 
 export const TERMINAL_FONT_SIZE_DEFAULT = 14;
 export const TERMINAL_FONT_SIZE_MIN = 8;
@@ -350,6 +357,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorCustomFormatCommand: "",
   lspActivation: {},
   lspCustomServers: [],
+  tmuxSplitKeys: null,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -543,6 +551,9 @@ export async function loadPreferences(): Promise<Preferences> {
     lspCustomServers:
       get<LspCustomServer[]>(KEY_LSP_CUSTOM_SERVERS) ??
       DEFAULT_PREFERENCES.lspCustomServers,
+    tmuxSplitKeys:
+      get<boolean | null>(KEY_TMUX_SPLIT_KEYS) ??
+      DEFAULT_PREFERENCES.tmuxSplitKeys,
   };
 }
 
@@ -853,6 +864,10 @@ export async function setEditorCustomFormatCommand(
   await writePref(KEY_EDITOR_CUSTOM_FORMAT_COMMAND, value);
 }
 
+export async function setTmuxSplitKeys(value: boolean | null): Promise<void> {
+  await writePref(KEY_TMUX_SPLIT_KEYS, value);
+}
+
 export async function setAgentNotifications(value: boolean): Promise<void> {
   await writePref(KEY_AGENT_NOTIFICATIONS, value);
 }
@@ -946,6 +961,7 @@ export async function onPreferencesChange(
     [KEY_EDITOR_CUSTOM_FORMAT_COMMAND]: "editorCustomFormatCommand",
     [KEY_LSP_ACTIVATION]: "lspActivation",
     [KEY_LSP_CUSTOM_SERVERS]: "lspCustomServers",
+    [KEY_TMUX_SPLIT_KEYS]: "tmuxSplitKeys",
   };
   // Same-process writes still fire onChange immediately; cross-window writes
   // arrive via the Tauri event emitted by writePref().

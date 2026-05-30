@@ -14,3 +14,4 @@ export {
 export { useShortcutLabel } from "./lib/useShortcutLabel";
 export { shortcutLabel } from "./lib/shortcutLabel";
 export { shouldDisablePaneSwapShortcut } from "./lib/shortcutScope";
+export { useTmuxSplit } from "./lib/useTmuxSplit";
