@@ -13,6 +13,7 @@ import { type FontWeight, Terminal } from "@xterm/xterm";
 import { shouldCursorBlink } from "./cursorBlink";
 import { createFileLinkProvider, fileExistenceCache } from "./fileLinkProvider";
 import { readClipboardImagePath } from "./imagePaste";
+import { getSelectionText } from "./selectionText";
 import {
   readTerminalClipboard,
   writeTerminalClipboard,
@@ -80,6 +81,7 @@ export type Slot = {
   lastW: number;
   lastH: number;
   lastUsedAt: number;
+  copyListener: ((e: ClipboardEvent) => void) | null;
 };
 
 const slots: Slot[] = [];
@@ -253,6 +255,7 @@ function createSlot(): Slot {
     lastW: 0,
     lastH: 0,
     lastUsedAt: 0,
+    copyListener: null,
   };
 
   // The provider closes over `slot.currentLeafId`, which mutates as the slot
@@ -310,8 +313,11 @@ function createSlot(): Slot {
     }
     if (isTerminalCopy(event)) {
       if (event.type === "keydown" && slot.term.hasSelection()) {
-        const sel = slot.term.getSelection();
-        if (sel) void writeTerminalClipboard(sel);
+        // getSelectionText drops xterm's visual line-wraps so a copied path
+        // survives the round-trip; writeTerminalClipboard is the native path
+        // (navigator.clipboard is unreliable on Linux/GTK).
+        const text = getSelectionText(slot.term);
+        if (text) void writeTerminalClipboard(text);
       }
       event.preventDefault();
       return false;
@@ -323,6 +329,8 @@ function createSlot(): Slot {
     }
     return true;
   });
+
+  attachCopyListener(slot);
 
   term.onData((data) => {
     const leafId = slot.currentLeafId;
@@ -517,6 +525,8 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
     p.drainRing((bytes) => slot.term.write(bytes));
   }
 
+  attachCopyListener(slot);
+
   setupResizeObserver(slot, p);
   slot.fitAddon.fit();
   slot.lastCols = slot.term.cols;
@@ -596,6 +606,7 @@ function rewireSlot(slot: Slot, p: AcquireParams): void {
   }
   slot.lastCols = slot.term.cols;
   slot.lastRows = slot.term.rows;
+  attachCopyListener(slot);
   p.onSearchReady(slot.searchAddon);
 }
 
@@ -652,6 +663,25 @@ export function releaseSlot(leafId: number): ReleaseOutput | null {
   return { cols: slot.term.cols, rows: slot.term.rows };
 }
 
+// Intercept the browser-native `copy` event (right-click → Copy, menu copy)
+// so it strips xterm's soft line-wraps just like the keyboard copy path.
+function attachCopyListener(slot: Slot): void {
+  if (slot.copyListener) {
+    slot.host.removeEventListener("copy", slot.copyListener, true);
+  }
+  const handler = (e: ClipboardEvent) => {
+    if (!slot.term.hasSelection()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const text = getSelectionText(slot.term);
+    if (text && e.clipboardData) {
+      e.clipboardData.setData("text/plain", text);
+    }
+  };
+  slot.host.addEventListener("copy", handler, true);
+  slot.copyListener = handler;
+}
+
 function serializeSlot(slot: Slot): SerializeOutput {
   let snapshot: string | null = null;
   try {
@@ -672,6 +702,11 @@ function serializeSlot(slot: Slot): SerializeOutput {
 }
 
 function detachSlotFromLeaf(slot: Slot, retain: boolean): void {
+  if (slot.copyListener) {
+    slot.host.removeEventListener("copy", slot.copyListener, true);
+    slot.copyListener = null;
+  }
+
   if (retain && slot.currentLeafId !== null) {
     slot.retainedLeafId = slot.currentLeafId;
     parkSlotHost(slot);
