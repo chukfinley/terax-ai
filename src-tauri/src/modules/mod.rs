@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod claude_usage;
+pub mod clipboard;
 pub mod fs;
 pub mod git;
 pub mod media_server;

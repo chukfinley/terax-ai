@@ -17,3 +17,4 @@ export {
   type PaneNode,
   type SplitDir,
 } from "./lib/panes";
+export { cleanupTempClipboardImages } from "./lib/imagePaste";

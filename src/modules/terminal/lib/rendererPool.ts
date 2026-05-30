@@ -1,4 +1,5 @@
 import { detectMonoFontFamily } from "@/lib/fonts";
+import { quoteShellArg } from "@/lib/shellQuote";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -10,6 +11,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import { createFileLinkProvider, fileExistenceCache } from "./fileLinkProvider";
+import { readClipboardImagePath } from "./imagePaste";
 import {
   terminalDeleteSequence,
   terminalLineNavigationSequence,
@@ -251,14 +253,7 @@ function createSlot(): Slot {
       return false;
     }
     if (isTerminalPaste(event)) {
-      if (event.type === "keydown") {
-        void navigator.clipboard
-          .readText()
-          .then((text) => {
-            if (text) slot.term.paste(text);
-          })
-          .catch(() => {});
-      }
+      if (event.type === "keydown") void handleTerminalPaste(slot);
       event.preventDefault();
       return false;
     }
@@ -760,14 +755,29 @@ function isTerminalCopy(e: KeyboardEvent): boolean {
 }
 
 function isTerminalPaste(e: KeyboardEvent): boolean {
-  return (
-    !IS_MAC &&
-    e.ctrlKey &&
-    e.shiftKey &&
-    !e.altKey &&
-    !e.metaKey &&
-    (e.code === "KeyV" || e.key === "v" || e.key === "V")
-  );
+  const isV = e.code === "KeyV" || e.key === "v" || e.key === "V";
+  if (!isV) return false;
+  if (IS_MAC) {
+    return e.metaKey && !e.altKey && !e.ctrlKey;
+  }
+  // Windows/Linux: cover both Ctrl+V and Ctrl+Shift+V so image paste lands
+  // on the binding users actually press. Plain Ctrl+V loses its quoted-insert
+  // (^V) behavior here, which is the documented tradeoff for AI-terminal use.
+  return e.ctrlKey && !e.altKey && !e.metaKey;
+}
+
+async function handleTerminalPaste(slot: Slot): Promise<void> {
+  const imagePath = await readClipboardImagePath();
+  if (imagePath) {
+    slot.term.paste(quoteShellArg(imagePath));
+    return;
+  }
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) slot.term.paste(text);
+  } catch {
+    /* ignore — empty clipboard or permission denial */
+  }
 }
 
 function isShiftEnter(e: KeyboardEvent): boolean {

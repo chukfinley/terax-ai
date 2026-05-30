@@ -1,7 +1,7 @@
 pub mod modules;
 
 use modules::{
-    agent, claude_usage, fs, git, media_server, net, pty, secrets, shell, workspace,
+    agent, claude_usage, clipboard, fs, git, media_server, net, pty, secrets, shell, workspace,
 };
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -191,6 +191,8 @@ pub fn run() {
             net::lm_ping,
             net::ai_http_request,
             net::ai_http_stream,
+            clipboard::clipboard_read_image,
+            clipboard::clipboard_cleanup_temp_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -82,6 +82,7 @@ import { MAX_PANES_PER_TAB, sessionKey, useSessionLoad, useTabs, useWorkspaceCwd
 import { saveSession } from "@/modules/tabs/lib/sessionPersistence";
 import { serializeSession } from "@/modules/tabs/lib/sessionSerialize";
 import {
+  cleanupTempClipboardImages,
   clearFocusedTerminal,
   disposeSession,
   findLeafCwd,
@@ -399,6 +400,9 @@ export default function App() {
         }
       })
       .catch(() => setHome(null));
+    // Image-paste temp files accumulate in $TMPDIR; clear anything older than
+    // 24h on startup. Fire-and-forget — failure is non-fatal.
+    void cleanupTempClipboardImages();
   }, []);
 
   const switchWorkspace = useCallback(
