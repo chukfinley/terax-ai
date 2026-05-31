@@ -1,8 +1,8 @@
 pub mod modules;
 
 use modules::{
-    agent, agent_cli, claude_usage, clipboard, fs, git, media_server, net, pty, secrets, shell,
-    tmux_config, workspace,
+    agent, agent_cli, claude, claude_usage, clipboard, fs, git, media_server, net, pty, secrets,
+    shell, tmux_config, workspace,
 };
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -117,6 +117,7 @@ pub fn run() {
         .manage(secrets::SecretsState::default())
         .manage(fs::watch::FsWatchState::default())
         .manage(agent_cli::AgentCliState::default())
+        .manage(claude::ClaudeState::default())
         .manage({
             let registry = workspace::WorkspaceRegistry::default();
             workspace::bootstrap_registry(&registry);
@@ -187,6 +188,9 @@ pub fn run() {
             open_settings_window,
             agent::agent_enable_claude_hooks,
             agent::agent_claude_hooks_status,
+            claude::claude_find_transcript,
+            claude::claude_transcript_subscribe,
+            claude::claude_transcript_unsubscribe,
             agent_cli::agent_cli_which,
             agent_cli::agent_cli_spawn,
             agent_cli::agent_cli_kill,
