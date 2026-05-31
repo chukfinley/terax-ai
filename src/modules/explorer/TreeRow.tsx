@@ -93,6 +93,12 @@ function EntryRowImpl(props: EntryRowProps) {
     <button
       type="button"
       data-fs-path={path}
+      onMouseDown={(e) => {
+        // Shift+click would text-select across rows; `select-none` on the row
+        // prevents that without preventDefault, which would also block focus
+        // and stop the Delete/F2 keys from reaching the tree.
+        if (e.shiftKey) e.currentTarget.focus();
+      }}
       onClick={handleClick}
       onDoubleClick={() => !isDir && onOpenFile(path, true)}
       onAuxClick={(e) => {
@@ -105,7 +111,7 @@ function EntryRowImpl(props: EntryRowProps) {
         }
       }}
       className={cn(
-        "group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] transition-colors hover:bg-accent/70",
+        "group flex h-6 w-full min-w-0 cursor-pointer select-none items-center gap-2 rounded-sm px-1.5 text-left text-[13px] transition-colors hover:bg-accent/70",
         isSelected
           ? "bg-accent text-foreground"
           : gitignored
