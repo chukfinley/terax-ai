@@ -225,6 +225,7 @@ export function AgentUsage() {
       <span key={w.label} className="flex items-center gap-1">
         <span className="text-muted-foreground">{w.label}</span>
         <span className={colorFor(w.utilization)}>{pctText(w)}</span>
+        {remain && <span className="text-muted-foreground/50">· {remain}</span>}
       </span>
     );
   };
@@ -255,7 +256,13 @@ export function AgentUsage() {
             <span className="text-muted-foreground italic">{selectedReason}</span>
           ) : windows.length ? (
             windows.flatMap((w, i) => {
-              const el = renderWindow(w, remainingText(w, now));
+              // Show each window's reset countdown. Skip it when this window
+              // shares the previous window's reset (Cursor's total/auto/api all
+              // reset on one billing cycle — show it once, not three times).
+              const ms = toMs(w.resets_at);
+              const prevMs = i > 0 ? toMs(windows[i - 1].resets_at) : null;
+              const remain = ms != null && ms === prevMs ? null : remainingText(w, now);
+              const el = renderWindow(w, remain);
               return i === 0
                 ? [el]
                 : [
