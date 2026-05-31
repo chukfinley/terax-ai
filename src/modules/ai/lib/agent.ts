@@ -8,9 +8,11 @@ import {
   type UIMessage,
 } from "ai";
 import {
+  CLI_PROVIDERS,
   DEFAULT_MODEL_ID,
   getModel,
   getModelContextLimit,
+  isCliProvider,
   LMSTUDIO_DEFAULT_BASE_URL,
   MAX_AGENT_STEPS,
   MLX_DEFAULT_BASE_URL,
@@ -21,6 +23,7 @@ import {
   type ModelId,
   type ProviderId,
 } from "../config";
+import { runCliAgentStream } from "../cli";
 import { buildTools, type ToolContext } from "../tools/tools";
 import { compactModelMessagesDetailed } from "./compact";
 import type { ProviderKeys } from "./keyring";
@@ -203,6 +206,13 @@ export async function buildLanguageModel(
       })(resolvedModelId);
       break;
     }
+    case "cli-claude":
+    case "cli-codex":
+    case "cli-cursor":
+    case "cli-opencode":
+      throw new Error(
+        "CLI agent providers do not build a LanguageModel; they stream via runCliAgentStream.",
+      );
     default: {
       const _exhaustive: never = provider;
       throw new Error(`Unsupported provider: ${_exhaustive as ProviderId}`);
@@ -365,6 +375,23 @@ export type RunAgentOptions = {
 
 export async function runAgentStream(opts: RunAgentOptions) {
   const modelId = opts.modelId ?? DEFAULT_MODEL_ID;
+  const provider = getModel(modelId).provider;
+
+  // CLI agent providers run their own end-to-end agent loop; we do not build a
+  // LanguageModel, attach Terax tools, or compact history. Hand the transcript
+  // to the CLI and relay its event stream into the chat UI.
+  if (isCliProvider(provider)) {
+    const cliId = CLI_PROVIDERS[provider];
+    if (!cliId) throw new Error(`No CLI agent mapped for provider ${provider}`);
+    return runCliAgentStream({
+      cliId,
+      uiMessages: opts.uiMessages,
+      cwd: opts.toolContext.getCwd(),
+      abortSignal: opts.abortSignal,
+      onStep: opts.onStep,
+    });
+  }
+
   const model = await buildConfiguredLanguageModel(modelId, opts.keys, {
     lmstudioBaseURL: opts.lmstudioBaseURL,
     lmstudioModelId: opts.lmstudioModelId,
@@ -376,7 +403,6 @@ export async function runAgentStream(opts: RunAgentOptions) {
     openaiCompatibleModelId: opts.openaiCompatibleModelId,
     openrouterModelId: opts.openrouterModelId,
   });
-  const provider = getModel(modelId).provider;
 
   const stableSystem = buildStableSystem(
     modelId,
