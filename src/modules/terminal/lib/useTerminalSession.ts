@@ -8,6 +8,7 @@ import {
   registerCwdHandler,
   registerPromptTracker,
 } from "./osc-handlers";
+import { useTerminalTitleStore } from "./terminalTitleStore";
 import { openPty, type PtySession } from "./pty-bridge";
 import {
   acquireSlot,
@@ -289,7 +290,14 @@ function bindLeafToSlot(leafId: number, s: Session): void {
         },
         shellState,
       );
-      return [prompt.dispose, cwd];
+      // OSC 0/2 window title (e.g. Claude Code's current task). Routed to the
+      // per-leaf title store so the pane header can show it. Empty titles are
+      // ignored so a reset/clear can't wipe the last meaningful title.
+      const titleSub = term.onTitleChange((title) => {
+        const t = title.trim();
+        if (t) useTerminalTitleStore.getState().setTitle(leafId, t);
+      });
+      return [prompt.dispose, cwd, () => titleSub.dispose()];
     },
     onSearchReady: (addon) => s.callbacks.onSearchReady?.(addon),
   });
@@ -402,6 +410,7 @@ export function disposeSession(leafId: number): void {
   s.pty?.close();
   s.pty = null;
   sessions.delete(leafId);
+  useTerminalTitleStore.getState().clear(leafId);
   readyLeaves.delete(leafId);
   const waiters = readyWaiters.get(leafId);
   if (waiters) {
