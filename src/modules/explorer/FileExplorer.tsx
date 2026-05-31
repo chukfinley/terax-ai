@@ -243,6 +243,15 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
       if (paths.length > 0) setDeleteConfirm(paths);
     }, [selectedPaths, activePath]);
 
+    // Context-menu delete: if the clicked row is part of the multi-selection,
+    // delete the whole selection; otherwise just that row.
+    const requestDeletePath = useCallback(
+      (path: string) => {
+        setDeleteConfirm(selectedPaths.has(path) ? [...selectedPaths] : [path]);
+      },
+      [selectedPaths],
+    );
+
     const confirmDelete = useCallback(async () => {
       const paths = deleteConfirm ?? [];
       setDeleteConfirm(null);
@@ -449,6 +458,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
               onRevealInTerminal={onRevealInTerminal}
               onAttachToAgent={onAttachToAgent}
               onOpenMarkdownPreview={onOpenMarkdownPreview}
+              onRequestDelete={requestDeletePath}
             />
           );
         }

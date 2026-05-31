@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { memo, type MouseEvent as ReactMouseEvent, useState } from "react";
+import { memo, type MouseEvent as ReactMouseEvent } from "react";
 import { InlineInput } from "./InlineInput";
 import {
   copyToClipboard,
@@ -37,6 +37,8 @@ export type EntryRowProps = {
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
   onOpenMarkdownPreview?: (path: string) => void;
+  /** Delete this row (or the whole selection if it is part of it). */
+  onRequestDelete: (path: string) => void;
 };
 
 function isMarkdownPath(path: string): boolean {
@@ -59,9 +61,8 @@ function EntryRowImpl(props: EntryRowProps) {
     onRevealInTerminal,
     onAttachToAgent,
     onOpenMarkdownPreview,
+    onRequestDelete,
   } = props;
-
-  const [isConfirming, setIsConfirming] = useState(false);
   const iconUrl = isDir ? folderIconUrl(name, isExpanded) : fileIconUrl(name);
   const createTarget = isDir ? path : path.slice(0, path.lastIndexOf("/")) || rootPath;
   const paddingLeft = 6 + depth * 12;
@@ -227,17 +228,9 @@ function EntryRowImpl(props: EntryRowProps) {
         <ContextMenuItem
           className={COMPACT_ITEM}
           variant="destructive"
-          onSelect={(e) => {
-            e.preventDefault();
-            if (isConfirming) {
-              void tree.deletePath(path);
-            } else {
-              setIsConfirming(true);
-            }
-          }}
-          onMouseLeave={() => setTimeout(() => setIsConfirming(false), 1500)}
+          onSelect={() => onRequestDelete(path)}
         >
-          {isConfirming ? "Click again to confirm" : "Delete"}
+          Delete
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
