@@ -1354,7 +1354,17 @@ export default function App() {
     if (!sessionStorageKey) return;
     if (!restoredApplied) return;
     const t = setTimeout(() => {
-      void saveSession(sessionStorageKey, serializeSession(tabs, activeId));
+      // Capture each terminal leaf's scrollback at save time (debounced) so the
+      // history above the prompt is restored on next launch. Display-only —
+      // getSnapshot returns a size-capped xterm serialize string or null.
+      void saveSession(
+        sessionStorageKey,
+        serializeSession(
+          tabs,
+          activeId,
+          (leafId) => terminalRefs.current.get(leafId)?.getSnapshot() ?? null,
+        ),
+      );
     }, 300);
     return () => clearTimeout(t);
   }, [tabs, activeId, sessionStorageKey, restoreSessionPref, restoredApplied]);
