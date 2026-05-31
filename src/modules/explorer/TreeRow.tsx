@@ -98,6 +98,15 @@ function EntryRowImpl(props: EntryRowProps) {
             data-fs-path={path}
             onClick={handleClick}
             onDoubleClick={() => !isDir && onOpenFile(path, true)}
+            onAuxClick={(e) => {
+              // Middle mouse button (scroll-wheel click) opens a file straight
+              // into a persistent new tab, browser-style.
+              if (e.button === 1 && !isDir) {
+                e.preventDefault();
+                onSelectPath(path);
+                onOpenFile(path, true);
+              }
+            }}
             className={cn(
               "group flex h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70",
               isSelected && "bg-accent text-foreground",

@@ -682,10 +682,30 @@ export default function App() {
   }, [openFileTab]);
 
   useEffect(() => {
-    setTerminalOpenFileHandler(async (_leafId, path, line, col) => {
+    setTerminalOpenFileHandler(async (leafId, path, line, col) => {
+      // A clicked directory → cd that same terminal into it, instead of trying
+      // to open a folder in the editor.
+      try {
+        const stat = await invoke<{ kind: string }>("fs_stat", {
+          path,
+          workspace: currentWorkspaceEnv(),
+        });
+        if (stat.kind === "dir") {
+          const term = terminalRefs.current.get(leafId);
+          if (term) {
+            term.write(`cd ${quoteShellArg(path)}\r`);
+            term.focus();
+          }
+          return true;
+        }
+      } catch {
+        /* stat failed — fall through and try to open it as a file */
+      }
+      // Files open in a persistent new tab (pin=true), not the transient
+      // single preview slot, so opening several files keeps them all.
       const id = openFileTab(
         path,
-        false, // preview slot — VSCode-style
+        true,
         line !== undefined ? { line, col } : undefined,
       );
       return id !== null;
