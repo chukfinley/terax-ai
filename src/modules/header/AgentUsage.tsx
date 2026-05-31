@@ -104,7 +104,9 @@ function toMs(resets_at: string | null): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
-/** Compact "1h23m" / "5m" / "<1m" until the reset time, or null if unknown/past. */
+/** Compact "4d8h" / "1h23m" / "5m" / "<1m" until the reset time, or null if
+ *  unknown/past. Days roll up past 24h so a monthly billing cycle reads as
+ *  "4d8h" instead of "104h45m". */
 function remainingText(w: UsageWindow, now: number): string | null {
   const t = toMs(w.resets_at);
   if (t == null) return null;
@@ -112,8 +114,10 @@ function remainingText(w: UsageWindow, now: number): string | null {
   if (diff <= 0) return null;
   const mins = Math.ceil(diff / 60_000);
   if (mins < 1) return "<1m";
-  const h = Math.floor(mins / 60);
+  const d = Math.floor(mins / 1440);
+  const h = Math.floor((mins % 1440) / 60);
   const m = mins % 60;
+  if (d > 0) return `${d}d${h}h`;
   return h > 0 ? `${h}h${m.toString().padStart(2, "0")}m` : `${m}m`;
 }
 
