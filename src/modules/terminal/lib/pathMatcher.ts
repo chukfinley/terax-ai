@@ -84,14 +84,23 @@ function looksLikeNonPath(token: string): boolean {
   if (SEMVER_REGEX.test(token)) return true;
   if (HEX_HASH_REGEX.test(token)) return true;
 
-  // Bare token (no path separator): allow well-known extensionless files
-  // (LICENSE, Makefile, Dockerfile, …); otherwise require a real extension
-  // (1-6 letter/digit chars after the final dot). "foo." / "foo.123" are not
-  // files; "foo.ts" / "foo.md" are. A real fs existence check filters the rest.
+  // Bare token (no path separator). These include `ls` output — plain file
+  // AND directory names (`src`, `node_modules`, `LICENSE`). We let them through
+  // to the real fs existence check (resolved against the terminal's cwd), which
+  // is the actual gate: only names that exist on disk get underlined. The cheap
+  // rejections above (numbers, semver, hashes) already filter obvious non-paths.
+  // The one extra rule: a token WITH a dot must have a plausible extension
+  // (1-6 letter/digit chars) so we don't flag "foo." or version-y "foo.123".
   if (!token.includes("/") && !token.includes("\\")) {
     if (KNOWN_EXTENSIONLESS.has(token.toLowerCase())) return false;
     const dot = token.lastIndexOf(".");
-    if (dot < 0) return true;
+    if (dot < 0) {
+      // Bare token, no extension (e.g. `src`, `node_modules`): allow it — but
+      // not date/timestamp-like tokens (`2026-05-22`, `2026-05-22T12`), which
+      // are almost never filenames and would be probed needlessly.
+      if (/^\d{4}-\d{2}-\d{2}/.test(token)) return true;
+      return false;
+    }
     const ext = token.slice(dot + 1);
     if (!/^[A-Za-z][A-Za-z0-9]{0,5}$/.test(ext)) return true;
   }

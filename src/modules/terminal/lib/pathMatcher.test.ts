@@ -1,48 +1,66 @@
 import { describe, expect, it } from "vitest";
 import { extractPathCandidates } from "./pathMatcher";
 
+// The matcher is deliberately permissive: bare names (including `ls` output —
+// plain files AND directories) are emitted as candidates, and a real fs
+// existence check (resolved against the terminal cwd) is the actual gate that
+// decides which ones underline. So these tests check that (a) real paths are
+// emitted, (b) the cheap obvious-non-path rejections (URLs, numbers, semver,
+// hashes, timestamps) still drop those specific tokens.
 describe("extractPathCandidates", () => {
+  const paths = (line: string) => extractPathCandidates(line).map((c) => c.path);
+
   it("matches a relative compiler path with line and col", () => {
-    const out = extractPathCandidates("src/foo.ts:42:5: error TS2322: …");
-    expect(out).toEqual([
-      { text: "src/foo.ts:42:5", start: 0, end: 15, path: "src/foo.ts", line: 42, col: 5 },
-    ]);
+    const out = extractPathCandidates("src/foo.ts:42:5: error TS2322");
+    expect(out.find((c) => c.path === "src/foo.ts")).toMatchObject({
+      line: 42,
+      col: 5,
+    });
   });
 
   it("matches a relative path with only a line number", () => {
     const out = extractPathCandidates("see ./bar.rs:7 for details");
-    expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ path: "./bar.rs", line: 7, col: undefined });
+    expect(out.find((c) => c.path === "./bar.rs")).toMatchObject({
+      line: 7,
+      col: undefined,
+    });
   });
 
   it("matches an absolute path", () => {
-    const out = extractPathCandidates("opened /etc/hosts");
-    expect(out).toEqual([
-      { text: "/etc/hosts", start: 7, end: 17, path: "/etc/hosts", line: undefined, col: undefined },
-    ]);
+    expect(paths("opened /etc/hosts")).toContain("/etc/hosts");
   });
 
   it("matches a Windows-style drive path", () => {
-    const out = extractPathCandidates("see C:\\Users\\me\\notes.md");
-    expect(out).toHaveLength(1);
-    expect(out[0].path).toBe("C:\\Users\\me\\notes.md");
+    expect(paths("see C:\\Users\\me\\notes.md")).toContain("C:\\Users\\me\\notes.md");
   });
 
   it("matches a bare filename with extension", () => {
-    const out = extractPathCandidates("touched README.md and package.json");
-    expect(out.map((c) => c.path)).toEqual(["README.md", "package.json"]);
+    expect(paths("touched README.md and package.json")).toEqual(
+      expect.arrayContaining(["README.md", "package.json"]),
+    );
   });
 
-  it("rejects URLs (left to WebLinksAddon)", () => {
-    expect(extractPathCandidates("see https://example.com/foo.ts")).toEqual([]);
+  it("emits bare names so `ls` files and directories are clickable", () => {
+    expect(paths("src docs node_modules LICENSE")).toEqual(
+      expect.arrayContaining(["src", "docs", "node_modules", "LICENSE"]),
+    );
+  });
+
+  it("rejects the path part of URLs (left to WebLinksAddon)", () => {
+    const p = paths("see https://example.com/foo.ts");
+    expect(p.some((x) => x.includes("example.com"))).toBe(false);
   });
 
   it("rejects semver, hex hashes, and bare numbers", () => {
-    expect(extractPathCandidates("version 1.2.3 sha abc1234def5 num 12.345")).toEqual([]);
+    const p = paths("version 1.2.3 sha abc1234def5 num 12.345");
+    expect(p).not.toContain("1.2.3");
+    expect(p).not.toContain("abc1234def5");
+    expect(p).not.toContain("12.345");
   });
 
   it("rejects timestamps", () => {
-    expect(extractPathCandidates("[2026-05-22T12:34:56] hi")).toEqual([]);
+    const p = paths("[2026-05-22T12:34:56] hi");
+    expect(p.some((x) => x.includes("2026-05-22"))).toBe(false);
   });
 
   it("skips lines longer than 1024 chars", () => {
@@ -55,12 +73,9 @@ describe("extractPathCandidates", () => {
     expect(extractPathCandidates(tokens).length).toBeLessThanOrEqual(32);
   });
 
-  it("preserves correct ranges for multiple matches", () => {
-    const line = "a.ts and b.ts";
-    const out = extractPathCandidates(line);
-    expect(out).toEqual([
-      { text: "a.ts", start: 0, end: 4, path: "a.ts", line: undefined, col: undefined },
-      { text: "b.ts", start: 9, end: 13, path: "b.ts", line: undefined, col: undefined },
-    ]);
+  it("preserves correct ranges for matches", () => {
+    const out = extractPathCandidates("a.ts and b.ts");
+    expect(out.find((c) => c.path === "a.ts")).toMatchObject({ start: 0, end: 4 });
+    expect(out.find((c) => c.path === "b.ts")).toMatchObject({ start: 9, end: 13 });
   });
 });
