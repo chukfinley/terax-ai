@@ -3,11 +3,13 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { cn } from "@/lib/utils";
 import type { SearchAddon } from "@xterm/addon-search";
 import { Fragment } from "react";
 import { useTerminalDropStore } from "./lib/dropStore";
 import { firstLeafSlotId, type PaneNode } from "./lib/panes";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
+import { useTerminalTitleStore } from "./lib/terminalTitleStore";
 
 type LeafBundle = {
   setRef: (h: TerminalPaneHandle | null) => void;
@@ -44,20 +46,23 @@ export function PaneTreeView(props: Props) {
           if (!focused) onFocusLeaf(node.id);
         }}
         data-pane-leaf={node.id}
-        className="relative h-full w-full"
+        className="relative flex h-full w-full flex-col"
       >
-        <TerminalPane
-          leafId={node.id}
-          visible={tabVisible}
-          focused={focused}
-          initialCwd={node.cwd}
-          blocks={blocks}
-          initialSnapshot={node.snapshot}
-          ref={b.setRef}
-          onSearchReady={b.onSearchReady}
-          onCwd={b.onCwd}
-          onExit={b.onExit}
-        />
+        <LeafTitleBar leafId={node.id} focused={focused} />
+        <div className="relative min-h-0 w-full flex-1">
+          <TerminalPane
+            leafId={node.id}
+            visible={tabVisible}
+            focused={focused}
+            initialCwd={node.cwd}
+            blocks={blocks}
+            initialSnapshot={node.snapshot}
+            ref={b.setRef}
+            onSearchReady={b.onSearchReady}
+            onCwd={b.onCwd}
+            onExit={b.onExit}
+          />
+        </div>
         <DropOverlay leafId={node.id} />
       </div>
     );
@@ -108,6 +113,28 @@ function DropOverlay({ leafId }: { leafId: number }) {
   return (
     <div className="pointer-events-none absolute inset-2 grid place-items-center rounded-lg border border-primary/45 bg-background/70 text-xs font-medium text-foreground shadow-lg backdrop-blur-sm">
       Drop file path here
+    </div>
+  );
+}
+
+// Thin header strip above each terminal pane showing its OSC window title (the
+// running program's self-reported label, e.g. a Claude Code session's current
+// task). Lets the user tell apart several split panes at a glance. Renders
+// nothing until a title arrives, so a plain shell that sets none stays clean.
+function LeafTitleBar({ leafId, focused }: { leafId: number; focused: boolean }) {
+  const title = useTerminalTitleStore((s) => s.titles[leafId]);
+  if (!title) return null;
+  return (
+    <div
+      title={title}
+      className={cn(
+        "flex h-[18px] shrink-0 select-none items-center truncate border-b px-2 text-[10px] font-medium leading-none tracking-tight",
+        focused
+          ? "border-border bg-muted/60 text-foreground/90"
+          : "border-border/40 bg-muted/20 text-muted-foreground",
+      )}
+    >
+      <span className="truncate">{title}</span>
     </div>
   );
 }
