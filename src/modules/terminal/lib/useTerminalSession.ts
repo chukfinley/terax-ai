@@ -417,9 +417,16 @@ export function useTerminalSession({
   const cbRef = useRef({ onSearchReady, onExit, onCwd });
   cbRef.current = { onSearchReady, onExit, onCwd };
 
+  // `initialCwd` only seeds the session on first creation; afterwards the cwd
+  // is driven by the shell's OSC 7 (every `cd`). Read it through a ref so a
+  // cwd change does NOT re-run the acquire effect — that would detach and
+  // re-attach the slot, freezing the terminal on each `cd`.
+  const initialCwdRef = useRef(initialCwd);
+  initialCwdRef.current = initialCwd;
+
   useEffect(() => {
     let cancelled = false;
-    const s = ensureSession(leafId, initialCwd);
+    const s = ensureSession(leafId, initialCwdRef.current);
     s.ready.then(() => {
       if (cancelled || s.disposed) return;
       const node = container.current;
@@ -435,7 +442,7 @@ export function useTerminalSession({
       cancelled = true;
       detachSession(leafId);
     };
-  }, [leafId, container, initialCwd]);
+  }, [leafId, container]);
 
   const fontSize = usePreferencesStore((p) => p.terminalFontSize);
   const zoomLevel = usePreferencesStore((p) => p.zoomLevel);
