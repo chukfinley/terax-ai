@@ -424,7 +424,14 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
 
   applyCursorBlinkOnSlot(slot, adapter?.isLeafFocused(p.leafId) ?? false);
 
-  if (p.altScreen && !p.shellExited) {
+  // Force a SIGWINCH-driven repaint on every (re)bind of a live PTY. Alt-screen
+  // TUIs need it (their dormant ring was discarded above). Normal-buffer TUIs
+  // that redraw cursor-relative — Claude Code and other Ink apps — need it too:
+  // after a tab switch their frame is replayed at a possibly-reflowed position
+  // and stays shifted ("flies down") until a manual resize fires SIGWINCH. A
+  // plain shell just redraws its prompt line, so the kick is harmless when no
+  // TUI is running.
+  if (!p.shellExited) {
     adapter?.resolveLeaf(p.leafId)?.kickPty(slot.term.cols, slot.term.rows);
   }
 
@@ -474,6 +481,11 @@ function rewireSlot(slot: Slot, p: AcquireParams): void {
   slot.lastCols = slot.term.cols;
   slot.lastRows = slot.term.rows;
   attachCopyListener(slot);
+  // Same repaint kick as bindSlot — a re-shown normal-buffer TUI (Claude Code)
+  // otherwise stays shifted until a manual resize. See the note in bindSlot.
+  if (!p.shellExited) {
+    adapter?.resolveLeaf(p.leafId)?.kickPty(slot.term.cols, slot.term.rows);
+  }
   p.onSearchReady(slot.searchAddon);
 }
 
