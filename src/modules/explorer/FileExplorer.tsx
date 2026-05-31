@@ -1,3 +1,13 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -250,7 +260,6 @@ export const FileExplorer = memo(
       name: string;
       isDir: boolean;
     } | null>(null);
-    const [deleteConfirm, setDeleteConfirm] = useState(false);
     // Bumped on every right-click so the menu content remounts and the popper
     // re-anchors to the new cursor (floating-ui won't reposition on an anchor
     // change alone, only on scroll/resize).
@@ -330,6 +339,50 @@ export const FileExplorer = memo(
       setSelectedPaths(new Set([path]));
       setAnchorPath(path);
       setActivePath(path);
+    }, []);
+
+    // Paths queued for deletion, awaiting confirmation (null = no dialog).
+    const [deleteConfirm, setDeleteConfirm] = useState<string[] | null>(null);
+
+    const requestDelete = useCallback(() => {
+      const paths =
+        selectedPaths.size > 0
+          ? [...selectedPaths]
+          : activePath
+            ? [activePath]
+            : [];
+      if (paths.length > 0) setDeleteConfirm(paths);
+    }, [selectedPaths, activePath]);
+
+    const confirmDelete = useCallback(async () => {
+      const paths = deleteConfirm ?? [];
+      setDeleteConfirm(null);
+      for (const p of paths) {
+        // eslint-disable-next-line no-await-in-loop
+        await tree.deletePath(p);
+      }
+      setSelectedPaths(new Set());
+      setAnchorPath(null);
+      setActivePath(null);
+    }, [deleteConfirm, tree]);
+
+    // Clicking into another surface (terminal, editor) clears the selection,
+    // like a normal file manager. Ignore clicks inside portaled menus/dialogs.
+    useEffect(() => {
+      const onDown = (e: MouseEvent) => {
+        const t = e.target as HTMLElement | null;
+        if (!t) return;
+        if (containerRef.current?.contains(t)) return;
+        if (
+          t.closest(
+            '[role="menu"],[role="dialog"],[data-radix-popper-content-wrapper]',
+          )
+        )
+          return;
+        setSelectedPaths((prev) => (prev.size ? new Set() : prev));
+      };
+      document.addEventListener("mousedown", onDown, true);
+      return () => document.removeEventListener("mousedown", onDown, true);
     }, []);
 
     const virtualizer = useVirtualizer({
@@ -492,6 +545,13 @@ export const FileExplorer = memo(
           tree.beginRename(entryPaths[currentIdx]);
           break;
         }
+        case "Delete":
+        case "Backspace": {
+          if (selectedPaths.size === 0 && !activePath) return;
+          e.preventDefault();
+          requestDelete();
+          break;
+        }
       }
     };
 
@@ -537,6 +597,7 @@ export const FileExplorer = memo(
     return (
       <div
         ref={containerRef}
+        data-explorer-root
         className="flex h-full flex-col outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
@@ -609,8 +670,8 @@ export const FileExplorer = memo(
 
         {!isSearchActive ? (
           <ContextMenu
-            onOpenChange={(open) => {
-              if (!open) setDeleteConfirm(false);
+            onOpenChange={() => {
+              /* confirmation lives in the delete dialog, nothing to reset */
             }}
           >
             <ContextMenuTrigger asChild>
@@ -637,7 +698,6 @@ export const FileExplorer = memo(
                       ? { path: row.path, name: row.name, isDir: row.isDir }
                       : null,
                   );
-                  setDeleteConfirm(false);
                   setMenuNonce((n) => n + 1);
                 }}
               >
@@ -798,18 +858,17 @@ export const FileExplorer = memo(
                   <ContextMenuItem
                     className={COMPACT_ITEM}
                     variant="destructive"
-                    onSelect={(e) => {
-                      if (deleteConfirm) {
-                        void tree.deletePath(menuTarget.path);
-                      } else {
-                        // Keep the menu open on the first click so the user
-                        // can confirm; let it close normally on the second.
-                        e.preventDefault();
-                        setDeleteConfirm(true);
-                      }
+                    onSelect={() => {
+                      // Acts on the whole selection when the right-clicked row
+                      // is part of it, else on that row alone.
+                      setDeleteConfirm(
+                        selectedPaths.has(menuTarget.path)
+                          ? [...selectedPaths]
+                          : [menuTarget.path],
+                      );
                     }}
                   >
-                    {deleteConfirm ? "Click again to confirm" : "Delete"}
+                    Delete
                   </ContextMenuItem>
                 </>
               ) : (
@@ -868,6 +927,36 @@ export const FileExplorer = memo(
             {dnd.dragLabel}
           </div>
         ) : null}
+        <AlertDialog
+          open={deleteConfirm !== null}
+          onOpenChange={(open) => {
+            if (!open) setDeleteConfirm(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Delete {deleteConfirm?.length ?? 0}{" "}
+                {(deleteConfirm?.length ?? 0) === 1 ? "item" : "items"}?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {(deleteConfirm?.length ?? 0) === 1
+                  ? `"${basename(deleteConfirm?.[0] ?? "")}" will be permanently deleted.`
+                  : `${deleteConfirm?.length ?? 0} selected items will be permanently deleted.`}{" "}
+                This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => void confirmDelete()}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }),
