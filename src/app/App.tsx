@@ -543,6 +543,11 @@ export default function App() {
     void hydrateSessions();
     void useAgentsStore.getState().hydrate();
     void useSnippetsStore.getState().hydrate();
+    // Install the Claude Code hooks on launch so agent detection, notifications,
+    // and the chat-view session binding work without the user enabling them by
+    // hand. Idempotent and self-migrating: re-running upgrades a stale install
+    // (e.g. one predating the transcript marker). Fire-and-forget.
+    void invoke("agent_enable_claude_hooks").catch(() => {});
   }, [hydrateSessions]);
 
   const activeTab = tabs.find((t) => t.id === activeId);
