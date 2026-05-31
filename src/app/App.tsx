@@ -152,6 +152,7 @@ const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 480;
 const SIDEBAR_WIDTH_STORAGE_KEY = "terax.sidebar.width";
 const SIDEBAR_VIEW_STORAGE_KEY = "terax.sidebar.view";
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "terax.sidebar.collapsed";
 
 function clampSidebarWidth(width: number): number {
   return Math.min(
@@ -180,6 +181,14 @@ function readSidebarView(): SidebarViewId {
     // ignore
   }
   return "explorer";
+}
+
+function readSidebarCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 export default function App() {
@@ -260,6 +269,23 @@ export default function App() {
   const sidebarRef = useRef<PanelImperativeHandle | null>(null);
   const sidebarWidthRef = useRef(readSidebarWidth());
   const sidebarWidthWriteTimerRef = useRef(0);
+  const sidebarCollapsedRef = useRef(readSidebarCollapsed());
+  // Programmatic collapses driven by zen mode are transient and must not be
+  // mistaken for the user collapsing the sidebar, so onResize skips persisting
+  // while zen is active.
+  const zenModeRef = useRef(false);
+  const persistSidebarCollapsed = useCallback((collapsed: boolean) => {
+    if (sidebarCollapsedRef.current === collapsed) return;
+    sidebarCollapsedRef.current = collapsed;
+    try {
+      window.localStorage.setItem(
+        SIDEBAR_COLLAPSED_STORAGE_KEY,
+        collapsed ? "1" : "0",
+      );
+    } catch {
+      // storage may fail in private mode
+    }
+  }, []);
   const [sidebarView, setSidebarViewState] = useState<SidebarViewId>(readSidebarView);
   const persistSidebarView = useCallback((view: SidebarViewId) => {
     setSidebarViewState(view);
@@ -281,6 +307,7 @@ export default function App() {
   const zenWasCollapsedRef = useRef(false);
   const [zenMode, setZenMode] = useState(false);
   useEffect(() => {
+    zenModeRef.current = zenMode;
     const panel = sidebarRef.current;
     if (!panel) return;
     if (zenMode) {
@@ -1724,13 +1751,22 @@ export default function App() {
               <ResizablePanel
                 id="sidebar"
                 panelRef={sidebarRef}
-                defaultSize={`${sidebarWidthRef.current}px`}
+                defaultSize={
+                  sidebarCollapsedRef.current
+                    ? "0px"
+                    : `${sidebarWidthRef.current}px`
+                }
                 minSize={`${SIDEBAR_MIN_WIDTH}px`}
                 maxSize={`${SIDEBAR_MAX_WIDTH}px`}
                 collapsible
                 collapsedSize={0}
                 onResize={(size) => {
-                  if (size.inPixels > 0) persistSidebarWidth(size.inPixels);
+                  if (size.inPixels > 0) {
+                    persistSidebarWidth(size.inPixels);
+                  }
+                  if (!zenModeRef.current) {
+                    persistSidebarCollapsed(size.inPixels <= 0);
+                  }
                 }}
               >
                 <div className="flex h-full min-h-0 flex-col border-r border-border/60 bg-card">
