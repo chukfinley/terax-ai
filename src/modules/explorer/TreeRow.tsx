@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { memo } from "react";
+import { memo, type MouseEvent as ReactMouseEvent } from "react";
 import { InlineInput } from "./InlineInput";
 import { explorerGitTextClass } from "./lib/gitStatusColor";
 import type { GitStatusCode } from "./lib/gitStatusUtils";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
+import type { SelectModifiers } from "./lib/selection";
 
 export type RowActions = {
   toggle: (path: string) => void;
@@ -26,7 +27,7 @@ export type EntryRowProps = {
   isRenaming: boolean;
   isDropTarget?: boolean;
   onOpenFile: (path: string, pin?: boolean) => void;
-  onSelectPath: (path: string) => void;
+  onSelectPath: (path: string, mods?: SelectModifiers) => void;
   gitStatusCode?: GitStatusCode | null;
   gitignored?: boolean;
 };
@@ -73,8 +74,16 @@ function EntryRowImpl(props: EntryRowProps) {
     );
   }
 
-  const handleClick = () => {
+  const handleClick = (e: ReactMouseEvent) => {
     if (renameInProgress) return;
+    // Shift extends from the anchor, Ctrl/Cmd toggles a single row; neither
+    // opens the file — selection only.
+    const shift = e.shiftKey;
+    const toggle = e.ctrlKey || e.metaKey;
+    if (shift || toggle) {
+      onSelectPath(path, { shift, toggle });
+      return;
+    }
     onSelectPath(path);
     if (isDir) actions.toggle(path);
     else onOpenFile(path);

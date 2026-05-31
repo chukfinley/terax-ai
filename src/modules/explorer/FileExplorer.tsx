@@ -36,6 +36,7 @@ import {
 } from "./lib/contextActions";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
+import { applySelection, type SelectModifiers } from "./lib/selection";
 import { useExplorerDnd } from "./lib/useExplorerDnd";
 import { useExplorerFileDrop } from "./lib/useExplorerFileDrop";
 import { useFileTree } from "./lib/useFileTree";
@@ -204,7 +205,13 @@ export const FileExplorer = memo(
       gitDecorations ? gitStatus : null,
       gitDecorations,
     );
-    const [selectedPath, setSelectedPath] = useState<string | null>(null);
+    // Multi-select: `selectedPaths` is the full selection, `activePath` the
+    // cursor row, `anchorPath` the shift-range origin.
+    const [selectedPaths, setSelectedPaths] = useState<Set<string>>(
+      () => new Set(),
+    );
+    const [anchorPath, setAnchorPath] = useState<string | null>(null);
+    const [activePath, setActivePath] = useState<string | null>(null);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
     const searchRef = useRef<ExplorerSearchHandle>(null);
@@ -286,10 +293,44 @@ export const FileExplorer = memo(
     }, [dropTargetDir, rootPath, tree.expanded, tree.expand]);
 
     useEffect(() => {
-      if (selectedPath && !entryIndexByPath.has(selectedPath)) {
-        setSelectedPath(null);
-      }
-    }, [entryIndexByPath, selectedPath]);
+      setSelectedPaths((prev) => {
+        let changed = false;
+        const next = new Set<string>();
+        for (const p of prev) {
+          if (entryIndexByPath.has(p)) next.add(p);
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+      setAnchorPath((prev) =>
+        prev && !entryIndexByPath.has(prev) ? null : prev,
+      );
+      setActivePath((prev) =>
+        prev && !entryIndexByPath.has(prev) ? null : prev,
+      );
+    }, [entryIndexByPath]);
+
+    const selectPath = useCallback(
+      (path: string, mods: SelectModifiers = {}) => {
+        const result = applySelection(
+          entryPaths,
+          selectedPaths,
+          anchorPath,
+          path,
+          mods,
+        );
+        setSelectedPaths(result.selected);
+        setAnchorPath(result.anchor);
+        setActivePath(result.active);
+      },
+      [entryPaths, selectedPaths, anchorPath],
+    );
+
+    const selectSingle = useCallback((path: string) => {
+      setSelectedPaths(new Set([path]));
+      setAnchorPath(path);
+      setActivePath(path);
+    }, []);
 
     const virtualizer = useVirtualizer({
       count: rows.length,
@@ -315,18 +356,18 @@ export const FileExplorer = memo(
       }
       if (!entryIndexByPath.has(activeFilePath)) return;
       lastSyncedActivePathRef.current = activeFilePath;
-      setSelectedPath(activeFilePath);
+      selectSingle(activeFilePath);
       requestAnimationFrame(() => scrollEntryIntoView(activeFilePath));
-    }, [activeFilePath, entryIndexByPath, scrollEntryIntoView]);
+    }, [activeFilePath, entryIndexByPath, scrollEntryIntoView, selectSingle]);
 
     useImperativeHandle(
       ref,
       () => ({
         focus: () => {
           containerRef.current?.focus();
-          if (!selectedPath && entryPaths.length > 0) {
+          if (!activePath && entryPaths.length > 0) {
             const first = entryPaths[0];
-            setSelectedPath(first);
+            selectSingle(first);
             requestAnimationFrame(() => scrollEntryIntoView(first));
           }
         },
@@ -341,7 +382,7 @@ export const FileExplorer = memo(
           searchRef.current?.focus();
         },
       }),
-      [entryPaths, scrollEntryIntoView, selectedPath],
+      [activePath, entryPaths, scrollEntryIntoView, selectSingle],
     );
 
     useGlobalShortcuts({
@@ -386,11 +427,11 @@ export const FileExplorer = memo(
         return;
       if (entryPaths.length === 0) return;
 
-      const currentIdx = selectedPath ? entryPaths.indexOf(selectedPath) : -1;
+      const currentIdx = activePath ? entryPaths.indexOf(activePath) : -1;
       const move = (next: number) => {
         const clamped = Math.max(0, Math.min(entryPaths.length - 1, next));
         const path = entryPaths[clamped];
-        setSelectedPath(path);
+        selectSingle(path);
         requestAnimationFrame(() => scrollEntryIntoView(path));
       };
 
@@ -429,7 +470,7 @@ export const FileExplorer = memo(
             tree.toggle(row.path);
           } else {
             const parent = row.path.slice(0, row.path.lastIndexOf("/"));
-            if (parent && parent !== rootPath) setSelectedPath(parent);
+            if (parent && parent !== rootPath) selectSingle(parent);
           }
           break;
         }
@@ -467,11 +508,11 @@ export const FileExplorer = memo(
               depth={row.depth}
               actions={rowActions}
               renameInProgress={renameInProgress}
-              isSelected={selectedPath === row.path}
+              isSelected={selectedPaths.has(row.path)}
               isRenaming={row.kind === "rename"}
               isDropTarget={dropTargetDir === row.path}
               onOpenFile={onOpenFile}
-              onSelectPath={setSelectedPath}
+              onSelectPath={selectPath}
               gitStatusCode={row.gitStatusCode}
               gitignored={gitDecorations && row.gitignored}
             />
