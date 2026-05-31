@@ -1272,6 +1272,76 @@ export default function App() {
     [focusPane],
   );
 
+  // --- Mouse back/forward navigation across tab activations ---------------
+  // Track the order tabs become active so the mouse side-buttons (button 3 =
+  // back, 4 = forward) move through that history — e.g. click a file path to
+  // open it, then press Back to return to the terminal you came from.
+  const navRef = useRef<{ stack: number[]; index: number }>({
+    stack: [],
+    index: -1,
+  });
+  const navSuppressRef = useRef(false);
+
+  useEffect(() => {
+    if (activeId == null) return;
+    // A change we caused via back/forward shouldn't rewrite history.
+    if (navSuppressRef.current) {
+      navSuppressRef.current = false;
+      return;
+    }
+    const nav = navRef.current;
+    if (nav.stack[nav.index] === activeId) return;
+    // Opening a new tab drops any forward entries, then appends.
+    nav.stack = nav.stack.slice(0, nav.index + 1);
+    nav.stack.push(activeId);
+    nav.index = nav.stack.length - 1;
+  }, [activeId]);
+
+  const navGo = useCallback(
+    (delta: number) => {
+      const nav = navRef.current;
+      let i = nav.index;
+      // Step over history entries whose tab has since been closed.
+      for (;;) {
+        i += delta;
+        if (i < 0 || i >= nav.stack.length) return;
+        const id = nav.stack[i];
+        if (tabsRef.current.some((t) => t.id === id)) {
+          nav.index = i;
+          navSuppressRef.current = true;
+          setActiveId(id);
+          return;
+        }
+      }
+    },
+    [setActiveId],
+  );
+
+  useEffect(() => {
+    const onMouseUp = (e: MouseEvent) => {
+      if (e.button === 3) {
+        e.preventDefault();
+        e.stopPropagation();
+        navGo(-1);
+      } else if (e.button === 4) {
+        e.preventDefault();
+        e.stopPropagation();
+        navGo(1);
+      }
+    };
+    // Swallow the matching mousedown so the webview never runs its own
+    // (no-op but flicker-prone) history navigation for these buttons.
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button === 3 || e.button === 4) e.preventDefault();
+    };
+    window.addEventListener("mouseup", onMouseUp, { capture: true });
+    window.addEventListener("mousedown", onMouseDown, { capture: true });
+    return () => {
+      window.removeEventListener("mouseup", onMouseUp, { capture: true });
+      window.removeEventListener("mousedown", onMouseDown, { capture: true });
+    };
+  }, [navGo]);
+
   const onResizeSplit = useCallback(
     (tabId: number, splitId: number, sizes: number[]) => {
       setSplitSizes(tabId, splitId, sizes);
