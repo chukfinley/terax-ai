@@ -12,6 +12,21 @@ Terax loads `TERAX.md` from the workspace root as agent memory (similar to AGENT
 - Frontend checks: `pnpm exec tsc --noEmit`, `pnpm test`
 - Rust checks: `cd src-tauri && cargo clippy && cargo test --locked`
 
+## Before building a feature
+
+Before implementing any user request, first check whether a solution already
+exists upstream. Someone may have already built it as a pull request.
+
+- Upstream repo: `crynta/terax-ai` (this fork is `chukfinley/terax-ai`).
+- List open PRs: `gh pr list --repo crynta/terax-ai --limit 100`. Search titles
+  for the feature/fix being asked for.
+- If a relevant PR exists, fetch and read it
+  (`git fetch upstream pull/<N>/head:pr-<N>`, then inspect its real diff against
+  its merge-base, not against current `main`), and reuse or adapt that work
+  instead of writing it from scratch. Take only the relevant commits/files and
+  drop unrelated noise the PR branch may carry.
+- Only build from scratch when nothing upstream covers it.
+
 ## Quality bar
 
 Production-grade or it does not ship. Every change is judged against all of these, not just "it works":
