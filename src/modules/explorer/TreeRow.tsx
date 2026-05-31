@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { memo, useState } from "react";
+import { memo, type MouseEvent as ReactMouseEvent, useState } from "react";
 import { InlineInput } from "./InlineInput";
 import {
   copyToClipboard,
@@ -17,6 +17,7 @@ import {
 } from "./lib/contextActions";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
+import type { SelectModifiers } from "./lib/selection";
 import type { useFileTree } from "./lib/useFileTree";
 
 type Tree = ReturnType<typeof useFileTree>;
@@ -32,7 +33,7 @@ export type EntryRowProps = {
   isSelected: boolean;
   isRenaming: boolean;
   onOpenFile: (path: string, pin?: boolean) => void;
-  onSelectPath: (path: string) => void;
+  onSelectPath: (path: string, mods?: SelectModifiers) => void;
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
   onOpenMarkdownPreview?: (path: string) => void;
@@ -65,8 +66,14 @@ function EntryRowImpl(props: EntryRowProps) {
   const createTarget = isDir ? path : path.slice(0, path.lastIndexOf("/")) || rootPath;
   const paddingLeft = 6 + depth * 12;
 
-  const handleClick = () => {
+  const handleClick = (e: ReactMouseEvent) => {
     if (tree.renaming) return;
+    const shift = e.shiftKey;
+    const toggle = e.ctrlKey || e.metaKey;
+    if (shift || toggle) {
+      onSelectPath(path, { shift, toggle });
+      return;
+    }
     onSelectPath(path);
     if (isDir) tree.toggle(path);
     else onOpenFile(path);
@@ -96,6 +103,9 @@ function EntryRowImpl(props: EntryRowProps) {
           <button
             type="button"
             data-fs-path={path}
+            onMouseDown={(e) => {
+              if (e.shiftKey) e.preventDefault();
+            }}
             onClick={handleClick}
             onDoubleClick={() => !isDir && onOpenFile(path, true)}
             onAuxClick={(e) => {
