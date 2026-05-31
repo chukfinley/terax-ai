@@ -1,3 +1,13 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -220,6 +230,50 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
       setActivePath(path);
     }, []);
 
+    // Paths queued for deletion, awaiting confirmation (null = no dialog).
+    const [deleteConfirm, setDeleteConfirm] = useState<string[] | null>(null);
+
+    const requestDelete = useCallback(() => {
+      const paths =
+        selectedPaths.size > 0
+          ? [...selectedPaths]
+          : activePath
+            ? [activePath]
+            : [];
+      if (paths.length > 0) setDeleteConfirm(paths);
+    }, [selectedPaths, activePath]);
+
+    const confirmDelete = useCallback(async () => {
+      const paths = deleteConfirm ?? [];
+      setDeleteConfirm(null);
+      for (const p of paths) {
+        // eslint-disable-next-line no-await-in-loop
+        await tree.deletePath(p);
+      }
+      setSelectedPaths(new Set());
+      setAnchorPath(null);
+      setActivePath(null);
+    }, [deleteConfirm, tree]);
+
+    // Clicking into another surface (terminal, editor) clears the selection,
+    // like a normal file manager. Ignore clicks inside portaled menus/dialogs.
+    useEffect(() => {
+      const onDown = (e: MouseEvent) => {
+        const t = e.target as HTMLElement | null;
+        if (!t) return;
+        if (containerRef.current?.contains(t)) return;
+        if (
+          t.closest(
+            '[role="menu"],[role="dialog"],[data-radix-popper-content-wrapper]',
+          )
+        )
+          return;
+        setSelectedPaths((prev) => (prev.size ? new Set() : prev));
+      };
+      document.addEventListener("mousedown", onDown, true);
+      return () => document.removeEventListener("mousedown", onDown, true);
+    }, []);
+
     const virtualizer = useVirtualizer({
       count: rows.length,
       getScrollElement: () => scrollRef.current,
@@ -365,6 +419,13 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
           tree.beginRename(entryPaths[currentIdx]);
           break;
         }
+        case "Delete":
+        case "Backspace": {
+          if (selectedPaths.size === 0 && !activePath) return;
+          e.preventDefault();
+          requestDelete();
+          break;
+        }
       }
     };
 
@@ -410,6 +471,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
     return (
       <div
         ref={containerRef}
+        data-explorer-root
         className="flex h-full flex-col outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
@@ -603,6 +665,37 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
             </ContextMenuContent>
           </ContextMenu>
         ) : null}
+
+        <AlertDialog
+          open={deleteConfirm !== null}
+          onOpenChange={(open) => {
+            if (!open) setDeleteConfirm(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Delete {deleteConfirm?.length ?? 0}{" "}
+                {(deleteConfirm?.length ?? 0) === 1 ? "item" : "items"}?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {(deleteConfirm?.length ?? 0) === 1
+                  ? `"${basename(deleteConfirm?.[0] ?? "")}" will be permanently deleted.`
+                  : `${deleteConfirm?.length ?? 0} selected items will be permanently deleted.`}{" "}
+                This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => void confirmDelete()}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   },
