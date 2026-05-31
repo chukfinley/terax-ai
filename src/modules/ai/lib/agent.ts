@@ -7,9 +7,11 @@ import {
   type UIMessage,
 } from "ai";
 import {
+  CLI_PROVIDERS,
   DEFAULT_MODEL_ID,
   endpointIdFromCompatModel,
   getModelContextLimit,
+  isCliProvider,
   isCompatModelId,
   LMSTUDIO_DEFAULT_BASE_URL,
   MAX_AGENT_STEPS,
@@ -22,6 +24,7 @@ import {
   type CustomEndpoint,
   type ProviderId,
 } from "../config";
+import { runCliAgentStream } from "../cli";
 import { buildTools, type ToolContext } from "../tools/tools";
 import { compactModelMessagesDetailed } from "./compact";
 import type { ProviderKeys, CustomEndpointKeys } from "./keyring";
@@ -207,6 +210,13 @@ export async function buildLanguageModel(
       })(resolvedModelId);
       break;
     }
+    case "cli-claude":
+    case "cli-codex":
+    case "cli-cursor":
+    case "cli-opencode":
+      throw new Error(
+        "CLI agent providers do not build a LanguageModel; they stream via runCliAgentStream.",
+      );
     default: {
       const _exhaustive: never = provider;
       throw new Error(`Unsupported provider: ${_exhaustive as ProviderId}`);
@@ -368,6 +378,25 @@ export type RunAgentOptions = {
 
 export async function runAgentStream(opts: RunAgentOptions) {
   const modelId = opts.modelId ?? DEFAULT_MODEL_ID;
+
+  // CLI agent providers run their own end-to-end agent loop; we do not build a
+  // LanguageModel, attach Terax tools, or compact history. Hand the transcript
+  // to the CLI and relay its event stream into the chat UI. Resolved before
+  // buildConfiguredLanguageModel, which has no model to build for a CLI agent.
+  const cliProvider = resolveModel(modelId, opts.customEndpoints ?? []).provider;
+  if (isCliProvider(cliProvider)) {
+    const cliId = CLI_PROVIDERS[cliProvider];
+    if (!cliId)
+      throw new Error(`No CLI agent mapped for provider ${cliProvider}`);
+    return runCliAgentStream({
+      cliId,
+      uiMessages: opts.uiMessages,
+      cwd: opts.toolContext.getCwd(),
+      abortSignal: opts.abortSignal,
+      onStep: opts.onStep,
+    });
+  }
+
   const model = await buildConfiguredLanguageModel(modelId, opts.keys, {
     lmstudioBaseURL: opts.lmstudioBaseURL,
     lmstudioModelId: opts.lmstudioModelId,

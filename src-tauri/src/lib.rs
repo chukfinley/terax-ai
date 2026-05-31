@@ -1,8 +1,8 @@
 pub mod modules;
 
 use modules::{
-    agent, claude_usage, clipboard, fs, git, history, lsp, media_server, net, pty,
-    secrets, shell, tmux_config, workspace,
+    agent, agent_cli, claude_usage, clipboard, fs, git, history, lsp, media_server,
+    net, pty, secrets, shell, tmux_config, workspace,
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -229,6 +229,7 @@ pub fn run() {
         .manage(history::HistoryState::default())
         .manage(lsp::LspState::default())
         .manage(fs::grep::ContentSearchState::default())
+        .manage(agent_cli::AgentCliState::default())
         .manage({
             let registry = workspace::WorkspaceRegistry::default();
             workspace::bootstrap_registry(&registry);
@@ -315,6 +316,9 @@ pub fn run() {
             open_settings_window,
             agent::agent_enable_hooks,
             agent::agent_hooks_status,
+            agent_cli::agent_cli_which,
+            agent_cli::agent_cli_spawn,
+            agent_cli::agent_cli_kill,
             secrets::secrets_get,
             secrets::secrets_set,
             secrets::secrets_delete,

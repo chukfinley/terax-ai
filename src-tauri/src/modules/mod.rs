@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod agent_cli;
 pub mod claude_usage;
 pub mod clipboard;
 pub mod fs;
