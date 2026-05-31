@@ -49,18 +49,47 @@ const SEMVER_REGEX = /^\d+\.\d+(?:\.\d+)+(?:[.\-][A-Za-z0-9]+)*$/;
 // Hex hash: 7+ hex chars, no dot, no slash.
 const HEX_HASH_REGEX = /^[0-9a-f]{7,}$/i;
 
+// Well-known extensionless project files. Bare tokens (no slash, no dot) are
+// normally rejected to avoid underlining every word, but these are real files
+// users expect to click — e.g. an uppercase `LICENSE`. Matched case-insensitively
+// against the whole token (these never have a path separator when bare).
+const KNOWN_EXTENSIONLESS = new Set([
+  "license",
+  "licence",
+  "readme",
+  "makefile",
+  "dockerfile",
+  "containerfile",
+  "copying",
+  "authors",
+  "changelog",
+  "contributing",
+  "notice",
+  "codeowners",
+  "gemfile",
+  "rakefile",
+  "procfile",
+  "vagrantfile",
+  "brewfile",
+  "justfile",
+  "todo",
+  "install",
+  "news",
+  "owners",
+]);
+
 function looksLikeNonPath(token: string): boolean {
   if (token.length > MAX_TOKEN_LENGTH) return true;
   if (PURE_NUMBER_REGEX.test(token)) return true;
   if (SEMVER_REGEX.test(token)) return true;
   if (HEX_HASH_REGEX.test(token)) return true;
-  // Pure single-word tokens with no slash, no dot — not a path.
-  if (!token.includes("/") && !token.includes("\\") && !token.includes(".")) {
-    return true;
-  }
-  // A bare-filename candidate must have a real extension (1-6 letter/digit chars
-  // after the final dot). "foo." or "foo.123" are not files; "foo.ts" / "foo.md" are.
+
+  // Bare token (no path separator): allow well-known extensionless files
+  // (LICENSE, Makefile, Dockerfile, …); otherwise require a real extension
+  // (1-6 letter/digit chars after the final dot). "foo." / "foo.123" are not
+  // files; "foo.ts" / "foo.md" are. A real fs existence check filters the rest.
   if (!token.includes("/") && !token.includes("\\")) {
+    if (KNOWN_EXTENSIONLESS.has(token.toLowerCase())) return false;
     const dot = token.lastIndexOf(".");
     if (dot < 0) return true;
     const ext = token.slice(dot + 1);
