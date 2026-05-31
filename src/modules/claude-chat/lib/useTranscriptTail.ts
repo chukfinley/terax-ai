@@ -1,23 +1,31 @@
 import { useEffect, useState } from "react";
-import { findTranscript, subscribeTranscript } from "./bridge";
+import { subscribeTranscript } from "./bridge";
 import { parseTranscript, type ChatMessage } from "./transcript";
 
 export type TailState = {
   messages: ChatMessage[];
-  status: "idle" | "searching" | "live" | "not-found";
+  status: "idle" | "live";
 };
 
 /**
- * While `active`, locate the transcript for the claude session running in `cwd`
- * and stream it into parsed chat messages. Re-parses the full accumulated text
- * on each chunk (transcripts are small enough; merging split assistant turns
- * needs the whole stream). Tears down the backend tail when inactive.
+ * While `active` and given the exact transcript `path` (learned from the Claude
+ * Code hooks, never guessed), stream that session's JSONL into parsed chat
+ * messages. Re-parses the full accumulated text on each chunk: transcripts are
+ * small, and merging split assistant turns needs the whole stream. Tears down
+ * the backend tail when inactive or when the path changes.
+ *
+ * No path means we don't yet know which of the project's many sibling sessions
+ * is this one (e.g. a fresh session before its first prompt). We stay idle and
+ * show nothing rather than mirror the wrong session.
  */
-export function useTranscriptTail(cwd: string | undefined, active: boolean): TailState {
+export function useTranscriptTail(
+  path: string | undefined,
+  active: boolean,
+): TailState {
   const [state, setState] = useState<TailState>({ messages: [], status: "idle" });
 
   useEffect(() => {
-    if (!active || !cwd) {
+    if (!active || !path) {
       setState({ messages: [], status: "idle" });
       return;
     }
@@ -25,15 +33,9 @@ export function useTranscriptTail(cwd: string | undefined, active: boolean): Tai
     let cancelled = false;
     let raw = "";
     let sub: { close: () => void } | null = null;
-    setState({ messages: [], status: "searching" });
+    setState({ messages: [], status: "live" });
 
     (async () => {
-      const path = await findTranscript(cwd).catch(() => null);
-      if (cancelled) return;
-      if (!path) {
-        setState({ messages: [], status: "not-found" });
-        return;
-      }
       sub = await subscribeTranscript(path, (chunk) => {
         if (cancelled) return;
         raw += chunk;
@@ -46,7 +48,7 @@ export function useTranscriptTail(cwd: string | undefined, active: boolean): Tai
       cancelled = true;
       sub?.close();
     };
-  }, [cwd, active]);
+  }, [path, active]);
 
   return state;
 }

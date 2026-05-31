@@ -100,8 +100,14 @@ fn find(agent: &str) -> Result<&'static AgentSpec, String> {
 
 fn hook_command(spec: &AgentSpec, event: &str) -> String {
     match spec.delivery {
+        // Two OSC 777 markers in one terminalSequence: the status word
+        // (working/attention/finished) and `transcript;<base64-path>`. The path
+        // comes from the hook's stdin JSON (`transcript_path`), extracted with
+        // sed so we don't depend on jq. This lets the chat GUI mirror the exact
+        // running session instead of guessing the newest file among the
+        // project's sibling sessions.
         Delivery::TerminalSequence => format!(
-            r#"[ -n "$TERAX_TERMINAL" ] && printf '{{"terminalSequence":"\\u001b]777;notify;Terax;{event}\\u0007"}}' || true"#
+            r#"[ -n "$TERAX_TERMINAL" ] && {{ __tp=$(sed -n 's/.*"transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'); __b=$(printf '%s' "$__tp" | base64 2>/dev/null | tr -d '\n'); printf '{{"terminalSequence":"\\u001b]777;notify;Terax;{event}\\u0007\\u001b]777;notify;Terax;transcript;%s\\u0007"}}' "$__b"; }} || true"#
         ),
         Delivery::Osc => osc_command(spec.agent, event),
     }
@@ -338,9 +344,18 @@ pub fn agent_hooks_status(agent: String) -> bool {
     else {
         return false;
     };
-    spec.events
+    let status_ok = spec
+        .events
         .iter()
-        .all(|(_, m)| content.contains(&status_needle(spec, m)))
+        .all(|(_, m)| content.contains(&status_needle(spec, m)));
+    // Require the transcript marker too, so installs predating it are reported
+    // as not-enabled and get upgraded on the next enable.
+    match spec.delivery {
+        Delivery::TerminalSequence => {
+            status_ok && content.contains("notify;Terax;transcript;")
+        }
+        Delivery::Osc => status_ok,
+    }
 }
 
 #[cfg(test)]
@@ -373,6 +388,9 @@ mod tests {
         assert!(command(&out, "UserPromptSubmit", 0).contains("notify;Terax;working"));
         assert!(command(&out, "Stop", 0).contains("terminalSequence"));
         assert!(!command(&out, "Stop", 0).contains("/dev/tty"));
+        // Each hook also reports the session transcript path for the chat mirror.
+        assert!(command(&out, "UserPromptSubmit", 0).contains("notify;Terax;transcript;"));
+        assert!(command(&out, "UserPromptSubmit", 0).contains("transcript_path"));
     }
 
     #[test]

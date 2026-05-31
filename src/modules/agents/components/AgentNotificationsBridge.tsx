@@ -71,6 +71,9 @@ function handleSignal(sig: AgentSignal, ctx: Ctx): void {
     case "working":
       store.setStatus(leafId, "working");
       return;
+    case "transcript":
+      if (sig.path) store.setTranscript(leafId, sig.path);
+      return;
     case "attention": {
       store.setStatus(leafId, "waiting");
       const session = store.sessions[leafId];

@@ -1,3 +1,4 @@
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import {
   Conversation,
   ConversationContent,
@@ -18,7 +19,12 @@ import { Tool } from "@/components/ai-elements/tool";
 import { Button } from "@/components/ui/button";
 import { AiDiffPane } from "@/modules/editor/AiDiffPane";
 import { writeToSession } from "@/modules/terminal";
-import { ArrowUpIcon, SquareIcon } from "@hugeicons/core-free-icons";
+import {
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  ArrowUpIcon,
+  SquareIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useRef, useState } from "react";
 import { useTranscriptTail } from "./lib/useTranscriptTail";
@@ -27,12 +33,35 @@ import type { ChatMessage, ChatPart } from "./lib/transcript";
 
 type Props = {
   leafId: number;
-  cwd: string | undefined;
+  /** Exact transcript path for this session (from hooks), or undefined if unknown yet. */
+  transcriptPath: string | undefined;
   active: boolean;
 };
 
-export function ClaudeChatView({ leafId, cwd, active }: Props) {
-  const { messages, status } = useTranscriptTail(cwd, active);
+// A permission block leaves the last assistant message ending in a tool call
+// that has no result yet. A tool that is merely still running looks the same in
+// the transcript, so the caller additionally gates on the agent `waiting`
+// status to tell the two apart.
+function pendingToolName(messages: ChatMessage[]): string | null {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "assistant") return null;
+  for (let i = last.parts.length - 1; i >= 0; i -= 1) {
+    const p = last.parts[i];
+    if (p.kind === "tool") {
+      return p.state === "input-available" ? p.name : null;
+    }
+  }
+  return null;
+}
+
+export function ClaudeChatView({ leafId, transcriptPath, active }: Props) {
+  const { messages, status } = useTranscriptTail(transcriptPath, active);
+  // A pending trailing tool call only means "awaiting permission" when the
+  // agent is also parked in `waiting`; a running tool is still `working`.
+  const agentStatus = useAgentStore((s) => s.sessions[leafId]?.status);
+  const awaitingTool =
+    agentStatus === "waiting" ? pendingToolName(messages) : null;
+  void awaitingTool;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -57,14 +86,14 @@ const ChatBody = memo(function ChatBody({
         <ConversationContent>
           <ConversationEmptyState
             title={
-              status === "not-found"
-                ? "No Claude session found"
-                : "Waiting for Claude"
+              status === "live"
+                ? "Waiting for Claude"
+                : "Type a message to begin"
             }
             description={
-              status === "not-found"
-                ? "Start `claude` in this terminal, then switch back to Chat."
-                : "Messages from the running Claude session will appear here."
+              status === "live"
+                ? "Messages from the running Claude session will appear here."
+                : "Send a message below and Claude's reply will show up here."
             }
           />
         </ConversationContent>
@@ -140,20 +169,7 @@ const RenderedPart = memo(function RenderedPart({ part }: { part: ChatPart }) {
     return (
       <div className="flex flex-col gap-2">
         {diffs.map((d, i) => (
-          <div
-            key={`${part.id}-${i}`}
-            className="h-[min(420px,60vh)] overflow-hidden"
-          >
-            <AiDiffPane
-              path={d.path}
-              originalContent={d.originalContent}
-              proposedContent={d.proposedContent}
-              status="approved"
-              isNewFile={d.isNewFile}
-              onAccept={noop}
-              onReject={noop}
-            />
-          </div>
+          <LazyDiff key={`${part.id}-${i}`} diff={d} />
         ))}
       </div>
     );
@@ -171,6 +187,50 @@ const RenderedPart = memo(function RenderedPart({ part }: { part: ChatPart }) {
 });
 
 function noop() {}
+
+type DiffSpec = ReturnType<typeof diffsFromTool>[number];
+
+// Collapsed by default: a session can hold hundreds of file edits, and eagerly
+// mounting a CodeMirror diff editor for each one froze the whole app. The heavy
+// AiDiffPane only mounts when the user expands a specific change.
+const LazyDiff = memo(function LazyDiff({ diff }: { diff: DiffSpec }) {
+  const [open, setOpen] = useState(false);
+  const name = diff.path.split("/").pop() || diff.path;
+
+  return (
+    <div className="overflow-hidden rounded-md border border-border/60">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12px] hover:bg-muted/50"
+      >
+        <HugeiconsIcon
+          icon={open ? ArrowDown01Icon : ArrowRight01Icon}
+          size={13}
+          strokeWidth={2}
+          className="shrink-0 text-muted-foreground"
+        />
+        <span className="truncate font-medium">{name}</span>
+        <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          {diff.isNewFile ? "new file" : "edit"}
+        </span>
+      </button>
+      {open ? (
+        <div className="h-[min(420px,60vh)] overflow-hidden border-t border-border/60">
+          <AiDiffPane
+            path={diff.path}
+            originalContent={diff.originalContent}
+            proposedContent={diff.proposedContent}
+            status="approved"
+            isNewFile={diff.isNewFile}
+            onAccept={noop}
+            onReject={noop}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+});
 
 const Composer = memo(function Composer({ leafId }: { leafId: number }) {
   const [value, setValue] = useState("");
