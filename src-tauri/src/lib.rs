@@ -1,8 +1,8 @@
 pub mod modules;
 
 use modules::{
-    agent, agent_cli, claude, claude_usage, clipboard, fs, git, media_server, net, pty, secrets,
-    shell, tmux_config, workspace,
+    agent, agent_cli, claude, claude_usage, clipboard, codex_usage, cursor_usage, fs, git,
+    media_server, net, pty, secrets, shell, tmux_config, workspace,
 };
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -142,6 +142,9 @@ pub fn run() {
             fs::file::fs_canonicalize,
             media_server::media_stream_url,
             claude_usage::claude_usage,
+            codex_usage::codex_usage,
+            codex_usage::agent_usage_clis,
+            cursor_usage::cursor_usage,
             fs::file::fs_exists,
             tmux_config::tmux_split_bindings,
             fs::mutate::fs_create_file,

@@ -49,6 +49,9 @@ notify = "8.2.0"
 base64 = "0.22"
 arboard = { version = "3.4", features = ["image-data"] }
 png = "0.17"
+# Cursor stores its auth token in a SQLite DB (state.vscdb); bundled so we
+# don't depend on a system libsqlite3.
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [dev-dependencies]
 proptest = "1"

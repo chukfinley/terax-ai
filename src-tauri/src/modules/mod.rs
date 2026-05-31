@@ -3,6 +3,8 @@ pub mod agent_cli;
 pub mod claude;
 pub mod claude_usage;
 pub mod clipboard;
+pub mod codex_usage;
+pub mod cursor_usage;
 pub mod fs;
 pub mod git;
 pub mod media_server;
