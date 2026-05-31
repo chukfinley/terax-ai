@@ -79,7 +79,7 @@ import {
   useSourceControl,
 } from "@/modules/source-control";
 import { StatusBar } from "@/modules/statusbar";
-import { MAX_PANES_PER_TAB, sessionKey, useSessionLoad, useTabs, useWorkspaceCwd } from "@/modules/tabs";
+import { MAX_PANES_PER_TAB, sessionKey, useSessionLoad, useTabs, useWindowTitle, useWorkspaceCwd } from "@/modules/tabs";
 import { saveSession } from "@/modules/tabs/lib/sessionPersistence";
 import { serializeSession } from "@/modules/tabs/lib/sessionSerialize";
 import {
@@ -728,6 +728,8 @@ export default function App() {
     tabs,
     launchCwd ?? home,
   );
+
+  useWindowTitle(activeTab, explorerRoot);
 
   useEffect(() => {
     setActiveSearchAddon(

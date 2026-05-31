@@ -15,6 +15,7 @@ export {
   type TabPatch,
 } from "./lib/useTabs";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
+export { useWindowTitle } from "./lib/useWindowTitle";
 export { useSessionLoad } from "./lib/useSessionLoad";
 export { sessionKey } from "./lib/sessionKey";
 export type { RestoredInitial } from "./lib/sessionDeserialize";
