@@ -16,9 +16,15 @@ import {
 } from "@/components/ai-elements/reasoning";
 import { Tool } from "@/components/ai-elements/tool";
 import { Button } from "@/components/ui/button";
+import { useAgentStore } from "@/modules/agents/store/agentStore";
 import { AiDiffPane } from "@/modules/editor/AiDiffPane";
 import { writeToSession } from "@/modules/terminal";
-import { ArrowUpIcon, SquareIcon } from "@hugeicons/core-free-icons";
+import {
+  ArrowUpIcon,
+  Cancel01Icon,
+  SquareIcon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useRef, useState } from "react";
 import { useTranscriptTail } from "./lib/useTranscriptTail";
@@ -31,18 +37,79 @@ type Props = {
   active: boolean;
 };
 
+// The claude TUI permission dialog defaults to the "Yes" option, so Enter
+// approves the highlighted choice and Esc cancels (denies).
+const KEY_APPROVE = "\r";
+const KEY_DENY = "\x1b";
+
+// A permission block leaves the last assistant message ending in a tool call
+// that has no result yet. A tool that is merely still running looks the same in
+// the transcript, so the caller additionally gates on the agent `waiting`
+// status to tell the two apart.
+function pendingToolName(messages: ChatMessage[]): string | null {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "assistant") return null;
+  for (let i = last.parts.length - 1; i >= 0; i -= 1) {
+    const p = last.parts[i];
+    if (p.kind === "tool") {
+      return p.state === "input-available" ? p.name : null;
+    }
+  }
+  return null;
+}
+
 export function ClaudeChatView({ leafId, cwd, active }: Props) {
   const { messages, status } = useTranscriptTail(cwd, active);
+  // A pending trailing tool call only means "awaiting permission" when the
+  // agent is also parked in `waiting`; a running tool is still `working`.
+  const agentStatus = useAgentStore((s) => s.sessions[leafId]?.status);
+  const awaitingTool =
+    agentStatus === "waiting" ? pendingToolName(messages) : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1">
         <ChatBody messages={messages} status={status} />
       </div>
+      {awaitingTool ? (
+        <PermissionBar leafId={leafId} toolName={awaitingTool} />
+      ) : null}
       <Composer leafId={leafId} />
     </div>
   );
 }
+
+const PermissionBar = memo(function PermissionBar({
+  leafId,
+  toolName,
+}: {
+  leafId: number;
+  toolName: string;
+}) {
+  const approve = useCallback(
+    () => writeToSession(leafId, KEY_APPROVE),
+    [leafId],
+  );
+  const deny = useCallback(() => writeToSession(leafId, KEY_DENY), [leafId]);
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-t border-amber-500/40 bg-amber-500/10 px-3 py-2">
+      <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />
+      <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+        Claude needs permission to run{" "}
+        <span className="font-medium">{toolName}</span>
+      </span>
+      <Button size="sm" className="h-7 gap-1.5" onClick={approve}>
+        <HugeiconsIcon icon={Tick02Icon} size={13} strokeWidth={2} />
+        Approve
+      </Button>
+      <Button size="sm" variant="ghost" className="h-7 gap-1.5" onClick={deny}>
+        <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
+        Deny
+      </Button>
+    </div>
+  );
+});
 
 const ChatBody = memo(function ChatBody({
   messages,
