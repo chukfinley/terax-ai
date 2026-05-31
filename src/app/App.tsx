@@ -101,6 +101,7 @@ import { setTerminalOpenFileHandler } from "@/modules/terminal/lib/useTerminalSe
 import { ThemeProvider, useThemeFileEditing } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import {
+  currentWorkspaceEnv,
   useWorkspaceEnvStore,
   workspaceScopeKey,
   type WorkspaceEnv,
@@ -1282,12 +1283,32 @@ export default function App() {
   // jumping to the line when the link carried one. Returning false lets the
   // link layer drop the path from its existence cache.
   useEffect(() => {
-    setTerminalOpenFileHandler(async (_leafId, path, line) => {
+    setTerminalOpenFileHandler(async (leafId, path, line) => {
+      // A clicked directory → cd that same terminal into it, instead of
+      // trying to open a folder in the editor.
+      try {
+        const stat = await invoke<{ kind: string }>("fs_stat", {
+          path,
+          workspace: currentWorkspaceEnv(),
+        });
+        if (stat.kind === "dir") {
+          const term = terminalRefs.current.get(leafId);
+          if (term) {
+            term.write(`cd ${quoteShellArg(path)}\r`);
+            term.focus();
+          }
+          return true;
+        }
+      } catch {
+        /* stat failed — fall through and try to open it as a file */
+      }
+      // Files open in a persistent tab (pin=true), not the transient preview
+      // slot, so opening several in a row keeps them all.
       if (line !== undefined) {
         openContentHit(path, line);
         return true;
       }
-      return openFileTab(path, false) !== null;
+      return openFileTab(path, true) !== null;
     });
     return () => {
       setTerminalOpenFileHandler(async () => false);
