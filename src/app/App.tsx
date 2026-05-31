@@ -267,6 +267,11 @@ export default function App() {
   // 24h on startup. Fire-and-forget — failure is non-fatal.
   useEffect(() => {
     void cleanupTempClipboardImages();
+    // Install the Claude Code hooks on launch so agent detection,
+    // notifications and the chat-view session binding work without the user
+    // enabling them by hand. Idempotent and self-migrating: re-running
+    // upgrades a stale install (e.g. one predating the transcript marker).
+    void invoke("agent_enable_hooks", { agent: "claude" }).catch(() => {});
   }, []);
 
   const prevSpaceRef = useRef(activeSpaceId);
