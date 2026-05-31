@@ -10,7 +10,7 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { useEffect, useMemo, useRef } from "react";
 import { PaneTreeView } from "./PaneTreeView";
 import type { TerminalPaneHandle } from "./TerminalPane";
-import { findLeafCwd, leafIds } from "./lib/panes";
+import { leafIds } from "./lib/panes";
 
 const NOOP_RESIZE = (_tabId: number, _splitId: number, _sizes: number[]) => {};
 
@@ -140,8 +140,12 @@ function TerminalTabBody({
   const hasAgent = useAgentStore((s) =>
     Object.values(s.sessions).some((sess) => sess.tabId === tab.id),
   );
+  // The exact transcript path for the active leaf's session, learned from the
+  // Claude Code hooks. Undefined until the first hook fires.
+  const transcriptPath = useAgentStore(
+    (s) => s.sessions[leafId]?.transcriptPath ?? undefined,
+  );
   const chatActive = mode === "chat" && hasAgent;
-  const cwd = findLeafCwd(tab.paneTree, leafId) ?? tab.cwd;
 
   return (
     <div className="relative h-full w-full">
@@ -163,7 +167,11 @@ function TerminalTabBody({
         )}
         aria-hidden={!chatActive}
       >
-        <ClaudeChatView leafId={leafId} cwd={cwd} active={chatActive && tabVisible} />
+        <ClaudeChatView
+          leafId={leafId}
+          transcriptPath={transcriptPath}
+          active={chatActive && tabVisible}
+        />
       </div>
 
       {hasAgent ? (

@@ -1,3 +1,5 @@
+use base64::Engine;
+
 const ESC: u8 = 0x1b;
 const BEL: u8 = 0x07;
 const OSC_INTRO: u8 = b']';
@@ -31,6 +33,10 @@ pub enum Transition {
     Attention,
     Finished,
     Exited,
+    // The session's transcript JSONL path, reported by our Claude Code hooks so
+    // the chat GUI mirrors the exact running session (never a newest-mtime guess
+    // among the project's many sibling sessions).
+    Transcript { path: String },
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -38,18 +44,30 @@ pub struct AgentSignal {
     pub id: u32,
     pub kind: &'static str,
     pub agent: Option<String>,
+    pub path: Option<String>,
 }
 
 impl Transition {
     pub fn into_signal(self, id: u32) -> AgentSignal {
         match self {
             Transition::Started { agent } => {
-                AgentSignal { id, kind: "started", agent: Some(agent) }
+                AgentSignal { id, kind: "started", agent: Some(agent), path: None }
             }
-            Transition::Working => AgentSignal { id, kind: "working", agent: None },
-            Transition::Attention => AgentSignal { id, kind: "attention", agent: None },
-            Transition::Finished => AgentSignal { id, kind: "finished", agent: None },
-            Transition::Exited => AgentSignal { id, kind: "exited", agent: None },
+            Transition::Working => {
+                AgentSignal { id, kind: "working", agent: None, path: None }
+            }
+            Transition::Attention => {
+                AgentSignal { id, kind: "attention", agent: None, path: None }
+            }
+            Transition::Finished => {
+                AgentSignal { id, kind: "finished", agent: None, path: None }
+            }
+            Transition::Exited => {
+                AgentSignal { id, kind: "exited", agent: None, path: None }
+            }
+            Transition::Transcript { path } => {
+                AgentSignal { id, kind: "transcript", agent: None, path: Some(path) }
+            }
         }
     }
 }
@@ -161,6 +179,19 @@ impl AgentDetector {
 
     fn handle_osc777<F: FnMut(Transition)>(&mut self, pt: &[u8], emit: &mut F) {
         if let Some(event) = pt.strip_prefix(TERAX_MARKER) {
+            // `transcript;<base64-path>`: identifies the exact session JSONL for
+            // the chat mirror. Carried by the same hooks as the status markers.
+            if let Some(b64) = event.strip_prefix(b"transcript;") {
+                if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(b64) {
+                    if let Ok(path) = String::from_utf8(decoded) {
+                        if !path.is_empty() {
+                            self.ensure_armed(emit);
+                            emit(Transition::Transcript { path });
+                        }
+                    }
+                }
+                return;
+            }
             // Self-arms so notifications work even when no shell preexec fired
             // (bash, Windows, tmux, wrappers).
             match event {
@@ -314,6 +345,31 @@ mod tests {
         assert_eq!(run(&mut d, &osc("777;notify;Terax;working")), vec![Transition::Working]);
         assert!(run(&mut d, &osc("777;notify;Terax;working")).is_empty());
         assert_eq!(run(&mut d, &osc("777;notify;Terax;finished")), vec![Transition::Finished]);
+    }
+
+    #[test]
+    fn transcript_marker_decodes_and_arms() {
+        let mut d = AgentDetector::new();
+        let path = "/home/u/.claude/projects/-x/abc.jsonl";
+        let b64 = base64::engine::general_purpose::STANDARD.encode(path);
+        let out = run(&mut d, &osc(&format!("777;notify;Terax;transcript;{b64}")));
+        assert_eq!(
+            out,
+            vec![
+                started("claude"),
+                Transition::Transcript { path: path.into() }
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_transcript_marker_is_ignored() {
+        let mut d = AgentDetector::new();
+        run(&mut d, &osc("133;C;claude"));
+        // Not valid base64 -> no Transcript, no panic.
+        assert!(run(&mut d, &osc("777;notify;Terax;transcript;!!!!")).is_empty());
+        // Empty payload -> ignored.
+        assert!(run(&mut d, &osc("777;notify;Terax;transcript;")).is_empty());
     }
 
     #[test]

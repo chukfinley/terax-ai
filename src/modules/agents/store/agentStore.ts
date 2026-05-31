@@ -16,6 +16,7 @@ type AgentStoreState = {
   notifications: AgentNotification[];
   start: (leafId: number, tabId: number, agent: string) => void;
   setStatus: (leafId: number, status: AgentStatus) => void;
+  setTranscript: (leafId: number, path: string) => void;
   finish: (leafId: number) => void;
   setLocalAgent: (state: LocalAgentState) => void;
   pushNotification: (
@@ -44,6 +45,7 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             startedAt: now,
             lastActivityAt: now,
             attentionSince: null,
+            transcriptPath: s.sessions[leafId]?.transcriptPath ?? null,
           },
         },
       };
@@ -63,6 +65,18 @@ export const useAgentStore = create<AgentStoreState>((set) => ({
             lastActivityAt: now,
             attentionSince: status === "waiting" ? now : null,
           },
+        },
+      };
+    }),
+
+  setTranscript: (leafId, path) =>
+    set((s) => {
+      const prev = s.sessions[leafId];
+      if (!prev || prev.transcriptPath === path) return s;
+      return {
+        sessions: {
+          ...s.sessions,
+          [leafId]: { ...prev, transcriptPath: path },
         },
       };
     }),

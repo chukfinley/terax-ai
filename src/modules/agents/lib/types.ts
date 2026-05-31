@@ -7,12 +7,14 @@ export type AgentSignalKind =
   | "working"
   | "attention"
   | "finished"
-  | "exited";
+  | "exited"
+  | "transcript";
 
 export type AgentSignal = {
   id: number;
   kind: AgentSignalKind;
   agent: string | null;
+  path: string | null;
 };
 
 export type AgentSession = {
@@ -23,6 +25,9 @@ export type AgentSession = {
   startedAt: number;
   lastActivityAt: number;
   attentionSince: number | null;
+  // The exact transcript JSONL path for this session, learned from the Claude
+  // Code hooks. Null until the first hook fires (e.g. the first prompt).
+  transcriptPath: string | null;
 };
 
 export type AgentNotification = {
