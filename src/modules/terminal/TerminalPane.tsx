@@ -20,6 +20,8 @@ export type TerminalPaneHandle = {
   focus: () => void;
   getBuffer: (maxLines?: number) => string | null;
   getSelection: () => string | null;
+  /** Size-capped scrollback snapshot for persistence; null when empty. */
+  getSnapshot: () => string | null;
 };
 
 type Props = {
@@ -32,6 +34,8 @@ type Props = {
   initialCwd?: string;
   /** Enable command-block decorations (OSC 133) for this terminal. */
   blocks?: boolean;
+  /** Restored scrollback (display-only); painted once when the session opens. */
+  initialSnapshot?: string;
   onSearchReady?: (leafId: number, addon: SearchAddon) => void;
   onExit?: (leafId: number, code: number) => void;
   onCwd?: (leafId: number, cwd: string) => void;
@@ -45,6 +49,7 @@ export const TerminalPane = memo(
       focused = true,
       initialCwd,
       blocks = false,
+      initialSnapshot,
       onSearchReady,
       onExit,
       onCwd,
@@ -62,6 +67,7 @@ export const TerminalPane = memo(
       focused,
       initialCwd,
       blocks,
+      initialSnapshot,
       onSearchReady: (a) => onSearchReady?.(leafId, a),
       onExit: (c) => onExit?.(leafId, c),
       onCwd: (c) => onCwd?.(leafId, c),
@@ -80,6 +86,7 @@ export const TerminalPane = memo(
         focus: () => session.focus(),
         getBuffer: (max?: number) => session.getBuffer(max),
         getSelection: () => session.getSelection(),
+        getSnapshot: () => session.getSnapshot(),
       }),
       [session],
     );
