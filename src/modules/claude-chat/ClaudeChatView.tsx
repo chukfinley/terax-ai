@@ -35,20 +35,13 @@ import { useTranscriptTail } from "./lib/useTranscriptTail";
 
 type Props = {
 	leafId: number;
-	/** Exact transcript path for this session (from hooks), or undefined if unknown yet. */
 	transcriptPath: string | undefined;
 	active: boolean;
 };
 
-// The claude TUI permission dialog defaults to the "Yes" option, so Enter
-// approves the highlighted choice and Esc cancels (denies).
 const KEY_APPROVE = "\r";
 const KEY_DENY = "\x1b";
 
-// A permission block leaves the last assistant message ending in a tool call
-// that has no result yet. A tool that is merely still running looks the same in
-// the transcript, so the caller additionally gates on the agent `waiting`
-// status to tell the two apart.
 function pendingToolName(messages: ChatMessage[]): string | null {
 	const last = messages[messages.length - 1];
 	if (!last || last.role !== "assistant") return null;
@@ -63,21 +56,24 @@ function pendingToolName(messages: ChatMessage[]): string | null {
 
 export function ClaudeChatView({ leafId, transcriptPath, active }: Props) {
 	const { messages, status } = useTranscriptTail(transcriptPath, active);
-	// A pending trailing tool call only means "awaiting permission" when the
-	// agent is also parked in `waiting`; a running tool is still `working`.
 	const agentStatus = useAgentStore((s) => s.sessions[leafId]?.status);
 	const awaitingTool =
 		agentStatus === "waiting" ? pendingToolName(messages) : null;
+	const streaming = agentStatus === "working";
 
 	return (
-		<div className="flex h-full min-h-0 flex-col">
-			<div className="min-h-0 flex-1">
-				<ChatBody messages={messages} status={status} />
-			</div>
+		<div className="flex h-full min-h-0 flex-col bg-background">
+			<ChatBody
+				messages={messages}
+				status={status}
+				streamingMessageId={
+					streaming ? messages[messages.length - 1]?.id ?? null : null
+				}
+			/>
 			{awaitingTool ? (
 				<PermissionBar leafId={leafId} toolName={awaitingTool} />
 			) : null}
-			<Composer leafId={leafId} active={active} />
+			<Composer leafId={leafId} active={active} streaming={streaming} />
 		</div>
 	);
 }
@@ -117,13 +113,15 @@ const PermissionBar = memo(function PermissionBar({
 const ChatBody = memo(function ChatBody({
 	messages,
 	status,
+	streamingMessageId,
 }: {
 	messages: ChatMessage[];
 	status: ReturnType<typeof useTranscriptTail>["status"];
+	streamingMessageId: string | null;
 }) {
 	if (messages.length === 0) {
 		return (
-			<Conversation>
+			<Conversation className="min-h-0 flex-1">
 				<ConversationContent>
 					<ConversationEmptyState
 						title={
@@ -143,10 +141,14 @@ const ChatBody = memo(function ChatBody({
 	}
 
 	return (
-		<Conversation>
-			<ConversationContent className="gap-5 p-3">
+		<Conversation className="min-h-0 flex-1">
+			<ConversationContent className="mx-auto w-full max-w-3xl gap-5 px-4 py-5">
 				{messages.map((m) => (
-					<RenderedMessage key={m.id} message={m} />
+					<RenderedMessage
+						key={m.id}
+						message={m}
+						streaming={m.id === streamingMessageId}
+					/>
 				))}
 			</ConversationContent>
 			<ConversationScrollButton />
@@ -156,8 +158,10 @@ const ChatBody = memo(function ChatBody({
 
 const RenderedMessage = memo(function RenderedMessage({
 	message,
+	streaming,
 }: {
 	message: ChatMessage;
+	streaming: boolean;
 }) {
 	if (message.role === "user") {
 		const text = message.parts
@@ -176,12 +180,24 @@ const RenderedMessage = memo(function RenderedMessage({
 		);
 	}
 
+	let lastTextIdx = -1;
+	for (let i = message.parts.length - 1; i >= 0; i -= 1) {
+		if (message.parts[i].kind === "text") {
+			lastTextIdx = i;
+			break;
+		}
+	}
+
 	return (
 		<Message from="assistant">
 			<MessageContent>
 				<div className="flex flex-col gap-3">
 					{message.parts.map((part, i) => (
-						<RenderedPart key={`${message.id}-${i}`} part={part} />
+						<RenderedPart
+							key={`${message.id}-${i}`}
+							part={part}
+							streaming={streaming && i === lastTextIdx}
+						/>
 					))}
 				</div>
 			</MessageContent>
@@ -189,10 +205,16 @@ const RenderedMessage = memo(function RenderedMessage({
 	);
 });
 
-const RenderedPart = memo(function RenderedPart({ part }: { part: ChatPart }) {
+const RenderedPart = memo(function RenderedPart({
+	part,
+	streaming,
+}: {
+	part: ChatPart;
+	streaming: boolean;
+}) {
 	if (part.kind === "text") {
 		if (!part.text.trim()) return null;
-		return <MessageResponse>{part.text}</MessageResponse>;
+		return <MessageResponse streaming={streaming}>{part.text}</MessageResponse>;
 	}
 
 	if (part.kind === "thinking") {
@@ -205,8 +227,6 @@ const RenderedPart = memo(function RenderedPart({ part }: { part: ChatPart }) {
 		);
 	}
 
-	// Tool call: render file mutations through the shared diff renderer, the rest
-	// through the shared Tool card.
 	const diffs = diffsFromTool(part.name, part.input);
 	if (diffs.length > 0) {
 		return (
@@ -233,15 +253,12 @@ function noop() {}
 
 type DiffSpec = ReturnType<typeof diffsFromTool>[number];
 
-// Collapsed by default: a session can hold hundreds of file edits, and eagerly
-// mounting a CodeMirror diff editor for each one froze the whole app. The heavy
-// AiDiffPane only mounts when the user expands a specific change.
 const LazyDiff = memo(function LazyDiff({ diff }: { diff: DiffSpec }) {
 	const [open, setOpen] = useState(false);
 	const name = diff.path.split("/").pop() || diff.path;
 
 	return (
-		<div className="overflow-hidden rounded-md border border-border/60">
+		<div className="overflow-hidden rounded-md border border-border/60 bg-card/40">
 			<button
 				type="button"
 				onClick={() => setOpen((v) => !v)}
@@ -278,72 +295,80 @@ const LazyDiff = memo(function LazyDiff({ diff }: { diff: DiffSpec }) {
 const Composer = memo(function Composer({
 	leafId,
 	active,
+	streaming,
 }: {
 	leafId: number;
 	active: boolean;
+	streaming: boolean;
 }) {
 	const [value, setValue] = useState("");
 	const taRef = useRef<HTMLTextAreaElement>(null);
 
-	// Grab focus when the chat face comes up so the user can type immediately.
-	// The terminal pane yields focus while chat is active (see LeafPane), so this
-	// doesn't fight xterm for the cursor.
 	useEffect(() => {
 		if (!active) return;
 		const id = requestAnimationFrame(() => taRef.current?.focus());
 		return () => cancelAnimationFrame(id);
 	}, [active]);
 
+	useEffect(() => {
+		const el = taRef.current;
+		if (!el) return;
+		el.style.height = "0px";
+		el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+	}, [value]);
+
 	const send = useCallback(() => {
 		const text = value.trim();
 		if (!text) return;
-		// Drive the same interactive PTY claude the terminal view talks to. The CR
-		// submits the prompt exactly as if typed in the TUI.
 		if (writeToSession(leafId, text + "\r")) {
 			setValue("");
 		}
 	}, [leafId, value]);
 
 	const interrupt = useCallback(() => {
-		// ESC cancels the current turn in the claude TUI.
 		writeToSession(leafId, "\x1b");
 	}, [leafId]);
 
 	return (
-		<div className="shrink-0 border-t border-border/60 p-2">
-			<div className="flex items-end gap-2 rounded-lg border border-border/60 bg-background px-2 py-1.5">
-				<textarea
-					ref={taRef}
-					value={value}
-					onChange={(e) => setValue(e.target.value)}
-					onKeyDown={(e) => {
-						if (e.key === "Enter" && !e.shiftKey) {
-							e.preventDefault();
-							send();
-						}
-					}}
-					rows={1}
-					placeholder="Message Claude…"
-					className="max-h-40 min-h-[1.75rem] flex-1 resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-				/>
-				<Button
-					size="icon"
-					variant="ghost"
-					className="size-7 shrink-0"
-					title="Interrupt (Esc)"
-					onClick={interrupt}
-				>
-					<HugeiconsIcon icon={SquareIcon} size={15} strokeWidth={2} />
-				</Button>
-				<Button
-					size="icon"
-					className="size-7 shrink-0"
-					title="Send (Enter)"
-					onClick={send}
-					disabled={!value.trim()}
-				>
-					<HugeiconsIcon icon={ArrowUpIcon} size={15} strokeWidth={2} />
-				</Button>
+		<div className="shrink-0 border-t border-border/60 bg-background px-3 pt-2 pb-3">
+			<div className="mx-auto w-full max-w-3xl">
+				<div className="flex items-end gap-1.5 rounded-2xl border border-border/60 bg-card/60 px-2.5 py-2 shadow-sm focus-within:border-border focus-within:ring-1 focus-within:ring-ring/30">
+					<textarea
+						ref={taRef}
+						value={value}
+						onChange={(e) => setValue(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" && !e.shiftKey) {
+								e.preventDefault();
+								send();
+							}
+						}}
+						rows={1}
+						placeholder="Message Claude…"
+						className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-[13px] leading-6 text-foreground outline-none placeholder:text-muted-foreground"
+					/>
+					{streaming ? (
+						<Button
+							size="icon"
+							variant="ghost"
+							className="size-7 shrink-0 rounded-full"
+							title="Interrupt (Esc)"
+							onClick={interrupt}
+						>
+							<HugeiconsIcon icon={SquareIcon} size={14} strokeWidth={2} />
+						</Button>
+					) : (
+						<Button
+							size="icon"
+							className="size-7 shrink-0 rounded-full"
+							title="Send (Enter)"
+							onClick={send}
+							disabled={!value.trim()}
+						>
+							<HugeiconsIcon icon={ArrowUpIcon} size={14} strokeWidth={2.25} />
+						</Button>
+					)}
+				</div>
 			</div>
 		</div>
 	);
