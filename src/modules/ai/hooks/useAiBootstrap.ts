@@ -1,3 +1,4 @@
+import { CLI_AGENT_BINS, detectCliAgents } from "../cli";
 import { useEffect, useState } from "react";
 import { firePendingReviewForSession } from "@/modules/agents/lib/review";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -54,7 +55,20 @@ export function useAiBootstrap(): {
     customEndpoints.some(
       (e) => e.baseURL.trim().length > 0 && e.modelId.trim().length > 0,
     );
-  const hasComposer = hasAnyKey(apiKeys) || hasLocalModel;
+  // Installed local CLI agents (Claude Code, Codex, cursor-agent, OpenCode)
+  // count as a provider too — no API key needed, they run their own loop.
+  const [hasInstalledCli, setHasInstalledCli] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void detectCliAgents(CLI_AGENT_BINS).then((paths) => {
+      if (!alive) return;
+      setHasInstalledCli(Object.values(paths).some((p) => !!p));
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const hasComposer = hasAnyKey(apiKeys) || hasLocalModel || hasInstalledCli;
 
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   const [keysLoaded, setKeysLoaded] = useState(false);

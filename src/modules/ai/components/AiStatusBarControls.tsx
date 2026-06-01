@@ -41,11 +41,13 @@ import {
   Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  CLI_PROVIDERS,
   compatModelIdForEndpoint,
   getCompatModelInfo,
   getModel,
+  isCliProvider,
   isCompatModelId,
   MODELS,
   providerNeedsKey,
@@ -56,6 +58,7 @@ import {
   type ModelInfo,
   type ProviderId,
 } from "../config";
+import { CLI_AGENTS, detectCliAgents } from "../cli";
 import { ACCEPTED_FILES, useComposer } from "../lib/composer";
 import { toggleFavoriteModel } from "../lib/modelPrefs";
 import { useChatStore } from "../store/chatStore";
@@ -225,14 +228,33 @@ function ModelDropdown() {
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("all");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // CLI providers (cli-claude / cli-codex / …) are "configured" iff the
+  // matching binary resolves on the user's login PATH. Otherwise the model
+  // picker would happily select an agent the host can't actually spawn.
+  const [cliPaths, setCliPaths] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    const bins = Object.values(CLI_PROVIDERS).map((id) => CLI_AGENTS[id].bin);
+    let alive = true;
+    void detectCliAgents(bins).then((paths) => {
+      if (alive) setCliPaths(paths);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const cliInstalled = (id: ProviderId): boolean => {
+    const cliId = CLI_PROVIDERS[id];
+    return !!cliId && !!cliPaths[CLI_AGENTS[cliId].bin];
+  };
+
+  const hasKeyFor = (id: ProviderId) => {
+    if (isCliProvider(id)) return cliInstalled(id);
+    return providerNeedsKey(id) ? !!apiKeys[id] : true;
+  };
   const currentProviderHasKey = isCompatModelId(selected)
     ? true
-    : providerNeedsKey(current.provider)
-      ? !!apiKeys[current.provider]
-      : true;
-
-  const hasKeyFor = (id: ProviderId) =>
-    providerNeedsKey(id) ? !!apiKeys[id] : true;
+    : hasKeyFor(current.provider);
 
   const epModelInfos = useMemo(() => {
     return customEndpoints.map((ep) =>
@@ -249,7 +271,7 @@ function ModelDropdown() {
     }
     return { configured, unconfigured };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKeys]);
+  }, [apiKeys, cliPaths]);
 
   const allModels = useMemo(
     () => [...MODELS, ...epModelInfos],
