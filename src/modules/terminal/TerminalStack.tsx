@@ -1,11 +1,4 @@
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { ClaudeChatView } from "@/modules/claude-chat/ClaudeChatView";
-import { useChatViewStore } from "@/modules/claude-chat/store/chatViewStore";
 import type { Tab } from "@/modules/tabs";
-import { BubbleChatIcon, TerminalIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { SearchAddon } from "@xterm/addon-search";
 import { useEffect, useMemo, useRef } from "react";
 import { selectLiveTerminals } from "./lib/liveTerminals";
@@ -116,10 +109,9 @@ export function TerminalStack({
   );
 }
 
-// One terminal tab: the live PTY pane tree, plus a Claude chat mirror overlaid
-// on top when chat mode is on for the tab's active leaf. The PTY tree stays
-// mounted underneath (hidden, not unmounted) so the running agent is never
-// killed by a view switch.
+// One terminal tab: the pane tree. The chat mirror and its toggle live per
+// leaf (LeafPane in PaneTreeView), so a split shows the chat only over the
+// pane actually running an agent.
 function TerminalTabBody({
   tab,
   tabVisible,
@@ -133,20 +125,6 @@ function TerminalTabBody({
   getBundle: (leafId: number) => Bundle;
   onResizeSplit?: (tabId: number, splitId: number, sizes: number[]) => void;
 }) {
-  const leafId = tab.activeLeafId;
-  const mode = useChatViewStore((s) => s.modes[leafId] ?? "terminal");
-  const toggle = useChatViewStore((s) => s.toggle);
-  // Only offer chat mode once a coding agent (claude) is detected in this tab.
-  const hasAgent = useAgentStore((s) =>
-    Object.values(s.sessions).some((sess) => sess.tabId === tab.id),
-  );
-  // The exact transcript path for the active leaf's session, learned from the
-  // Claude Code hooks. Undefined until the first hook fires.
-  const transcriptPath = useAgentStore(
-    (s) => s.sessions[leafId]?.transcriptPath ?? undefined,
-  );
-  const chatActive = mode === "chat" && hasAgent;
-
   return (
     <div className="relative h-full w-full">
       <PaneTreeView
@@ -160,43 +138,6 @@ function TerminalTabBody({
           (onResizeSplit ?? NOOP_RESIZE)(tab.id, splitId, sizes)
         }
       />
-
-      <div
-        className={cn(
-          "absolute inset-0 bg-background",
-          chatActive ? "" : "invisible pointer-events-none",
-        )}
-        aria-hidden={!chatActive}
-      >
-        <ClaudeChatView
-          leafId={leafId}
-          transcriptPath={transcriptPath}
-          active={chatActive && tabVisible}
-        />
-      </div>
-
-      {hasAgent ? (
-        <div className="absolute right-3 top-2 z-10 flex items-center gap-0.5 rounded-md border border-border/60 bg-background/90 p-0.5 shadow-sm backdrop-blur">
-          <Button
-            size="icon"
-            variant={mode === "terminal" ? "secondary" : "ghost"}
-            className="size-6"
-            title="Terminal view"
-            onClick={() => mode !== "terminal" && toggle(leafId)}
-          >
-            <HugeiconsIcon icon={TerminalIcon} size={13} strokeWidth={2} />
-          </Button>
-          <Button
-            size="icon"
-            variant={mode === "chat" ? "secondary" : "ghost"}
-            className="size-6"
-            title="Chat view"
-            onClick={() => mode !== "chat" && toggle(leafId)}
-          >
-            <HugeiconsIcon icon={BubbleChatIcon} size={13} strokeWidth={2} />
-          </Button>
-        </div>
-      ) : null}
     </div>
   );
 }
