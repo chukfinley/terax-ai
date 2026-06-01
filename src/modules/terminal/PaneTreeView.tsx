@@ -119,10 +119,12 @@ function LeafTitleBar({ leafId, focused }: { leafId: number; focused: boolean })
     <div
       title={title}
       className={cn(
+        // Opaque background so the terminal never shows through — the strip
+        // eats a sliver of height at the top, it does not float over the text.
         "flex h-[18px] shrink-0 select-none items-center truncate border-b px-2 text-[10px] font-medium leading-none tracking-tight",
         focused
-          ? "border-border bg-muted/60 text-foreground/90"
-          : "border-border/40 bg-muted/20 text-muted-foreground",
+          ? "border-border bg-muted text-foreground/90"
+          : "border-border/60 bg-background text-muted-foreground",
       )}
     >
       <span className="truncate">{title}</span>
