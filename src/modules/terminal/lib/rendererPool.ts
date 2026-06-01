@@ -11,7 +11,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import { createFileLinkProvider, fileExistenceCache } from "./fileLinkProvider";
-import { readClipboardImagePath } from "./imagePaste";
+import { readClipboardImagePath, readClipboardText } from "./imagePaste";
 import { getSelectionText } from "./selectionText";
 import {
   terminalDeleteSequence,
@@ -843,9 +843,18 @@ async function handleTerminalPaste(slot: Slot): Promise<void> {
     slot.term.paste(quoteShellArg(imagePath));
     return;
   }
+  // Read text through Rust (arboard), not navigator.clipboard.readText():
+  // WebKitGTK rejects the browser clipboard *read* API, so paste did nothing
+  // on Linux even though copy (writeText) works. Fall back to the browser API
+  // for non-Tauri/dev contexts and macOS where it's reliable.
+  const text = await readClipboardText();
+  if (text) {
+    slot.term.paste(text);
+    return;
+  }
   try {
-    const text = await navigator.clipboard.readText();
-    if (text) slot.term.paste(text);
+    const browserText = await navigator.clipboard.readText();
+    if (browserText) slot.term.paste(browserText);
   } catch {
     /* ignore — empty clipboard or permission denial */
   }

@@ -205,6 +205,7 @@ pub fn run() {
             net::ai_http_request,
             net::ai_http_stream,
             clipboard::clipboard_read_image,
+            clipboard::clipboard_read_text,
             clipboard::clipboard_cleanup_temp_images,
         ])
         .run(tauri::generate_context!())

@@ -25,11 +25,35 @@ pub async fn clipboard_read_image() -> Result<Option<String>, String> {
         .map_err(|e| e.to_string())?
 }
 
+/// Read the clipboard's plain text, or `None` when it holds no text.
+///
+/// The frontend uses this for terminal paste instead of the browser's
+/// `navigator.clipboard.readText()`: on Linux/WebKitGTK the async clipboard
+/// *read* API is unimplemented/rejected for security reasons (writes work,
+/// which is why copy succeeds but paste silently failed). arboard reads the
+/// native clipboard directly, so this works everywhere the image path does.
+#[tauri::command]
+pub async fn clipboard_read_text() -> Result<Option<String>, String> {
+    tokio::task::spawn_blocking(read_text_blocking)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn clipboard_cleanup_temp_images() -> Result<u32, String> {
     tokio::task::spawn_blocking(cleanup_blocking)
         .await
         .map_err(|e| e.to_string())
+}
+
+fn read_text_blocking() -> Result<Option<String>, String> {
+    let mut cb = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+    // arboard returns Err when the clipboard holds no string entry (e.g. an
+    // image-only clipboard) — that's not an error for us, just "no text".
+    match cb.get_text() {
+        Ok(text) if !text.is_empty() => Ok(Some(text)),
+        _ => Ok(None),
+    }
 }
 
 fn read_image_blocking() -> Result<Option<String>, String> {
