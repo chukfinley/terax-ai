@@ -120,7 +120,14 @@ import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { SearchAddon } from "@xterm/addon-search";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 
 type TuiWaitResult = "ready" | "gone" | "timeout";
@@ -270,6 +277,10 @@ export default function App() {
   const sidebarWidthRef = useRef(readSidebarWidth());
   const sidebarWidthWriteTimerRef = useRef(0);
   const sidebarCollapsedRef = useRef(readSidebarCollapsed());
+  // onResize fires once on mount with the expanded default size; persisting
+  // that would clobber a stored collapsed state before we restore it. Gate all
+  // persistence until the initial restore has run.
+  const sidebarRestoredRef = useRef(false);
   // Programmatic collapses driven by zen mode are transient and must not be
   // mistaken for the user collapsing the sidebar, so onResize skips persisting
   // while zen is active.
@@ -294,6 +305,16 @@ export default function App() {
     } catch {
       // storage may fail in private mode
     }
+  }, []);
+  // Restore the collapsed state on launch. defaultSize cannot express "start
+  // collapsed" reliably (a 0px default is clamped up to minSize), so collapse
+  // imperatively before first paint, then open the persistence gate.
+  useLayoutEffect(() => {
+    const panel = sidebarRef.current;
+    if (panel && sidebarCollapsedRef.current && !panel.isCollapsed()) {
+      panel.collapse();
+    }
+    sidebarRestoredRef.current = true;
   }, []);
   const toggleSidebar = useCallback(() => {
     const p = sidebarRef.current;
@@ -1751,16 +1772,13 @@ export default function App() {
               <ResizablePanel
                 id="sidebar"
                 panelRef={sidebarRef}
-                defaultSize={
-                  sidebarCollapsedRef.current
-                    ? "0px"
-                    : `${sidebarWidthRef.current}px`
-                }
+                defaultSize={`${sidebarWidthRef.current}px`}
                 minSize={`${SIDEBAR_MIN_WIDTH}px`}
                 maxSize={`${SIDEBAR_MAX_WIDTH}px`}
                 collapsible
                 collapsedSize={0}
                 onResize={(size) => {
+                  if (!sidebarRestoredRef.current) return;
                   if (size.inPixels > 0) {
                     persistSidebarWidth(size.inPixels);
                   }
