@@ -291,11 +291,16 @@ function bindLeafToSlot(leafId: number, s: Session): void {
         shellState,
       );
       // OSC 0/2 window title (e.g. Claude Code's current task). Routed to the
-      // per-leaf title store so the pane header can show it. Empty titles are
-      // ignored so a reset/clear can't wipe the last meaningful title.
+      // per-leaf title store so the pane header can show it. An empty title is
+      // a real "clear title" sequence — programs like Claude Code emit it on
+      // exit — so we drop the stored title (bar hides, window title falls back
+      // to the folder). xterm's reset()/clear() do NOT fire this event, so a
+      // pool rebind can't spuriously wipe a title.
       const titleSub = term.onTitleChange((title) => {
-        const t = title.trim();
-        if (t) useTerminalTitleStore.getState().setTitle(leafId, t);
+        const t = (title || "").trim();
+        const store = useTerminalTitleStore.getState();
+        if (t) store.setTitle(leafId, t);
+        else store.clear(leafId);
       });
       return [prompt.dispose, cwd, () => titleSub.dispose()];
     },
