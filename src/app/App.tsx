@@ -30,6 +30,7 @@ import {
   SelectionAskAi,
   useChatStore,
 } from "@/modules/ai";
+import { CLI_AGENT_BINS, detectCliAgents } from "@/modules/ai/cli";
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { redactSensitive } from "@/modules/ai/lib/redact";
 import { native } from "@/modules/ai/lib/native";
@@ -553,7 +554,20 @@ export default function App() {
     (ollamaBaseURL.trim().length > 0 && ollamaModelId.trim().length > 0) ||
     (openaiCompatibleBaseURL.trim().length > 0 &&
       openaiCompatibleModelId.trim().length > 0);
-  const hasComposer = hasAnyKey(apiKeys) || hasLocalModel;
+  // Installed local CLI agents (Claude Code, Codex, cursor-agent, OpenCode)
+  // count as a provider too — no API key needed, they run their own loop.
+  const [hasInstalledCli, setHasInstalledCli] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void detectCliAgents(CLI_AGENT_BINS).then((paths) => {
+      if (!alive) return;
+      setHasInstalledCli(Object.values(paths).some((p) => !!p));
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const hasComposer = hasAnyKey(apiKeys) || hasLocalModel || hasInstalledCli;
 
   const [keysLoaded, setKeysLoaded] = useState(false);
   useEffect(() => {

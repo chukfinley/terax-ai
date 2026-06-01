@@ -221,7 +221,13 @@ function createSlot(): Slot {
     // composed string through its own compositionend handler instead.
     // keyCode 229 ("Process") is what Chromium reports for every key
     // pressed inside an active IME session when isComposing is not yet set.
-    if (event.isComposing || event.keyCode === 229) return false;
+    // BUT: WebKitGTK (Linux Tauri) routes Ctrl/Cmd modifier combos through
+    // the GTK input-method and also tags them keyCode=229 — that would
+    // swallow Ctrl+Shift+V (paste), Ctrl+Shift+C (copy), etc. Modifier
+    // shortcuts can never be IME, so let them through.
+    const hasCommandMod = event.ctrlKey || event.metaKey;
+    if (!hasCommandMod && (event.isComposing || event.keyCode === 229))
+      return false;
 
     const leafId = slot.currentLeafId;
     if (leafId === null) return false;
