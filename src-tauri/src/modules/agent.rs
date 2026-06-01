@@ -11,9 +11,15 @@ const OWNED_MARKERS: [&str; 2] = ["notify;Terax;", "terax;notify"];
 
 // Gated on TERAX_TERMINAL; no-op outside Terax. Returns the sequence via
 // `terminalSequence` because hooks lost /dev/tty access in v2.1.139.
+//
+// Two OSC 777 markers are emitted in one terminalSequence: the status word
+// (working/attention/finished) and `transcript;<base64-path>`. The path comes
+// from the hook's stdin JSON (`transcript_path`), extracted with sed so we don't
+// depend on jq. This lets the chat GUI mirror the exact running session instead
+// of guessing the newest file among the project's many sibling sessions.
 fn hook_cmd(event: &str) -> String {
     format!(
-        r#"[ -n "$TERAX_TERMINAL" ] && printf '{{"terminalSequence":"\\u001b]777;notify;Terax;{event}\\u0007"}}' || true"#
+        r#"[ -n "$TERAX_TERMINAL" ] && {{ __tp=$(sed -n 's/.*"transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'); __b=$(printf '%s' "$__tp" | base64 2>/dev/null | tr -d '\n'); printf '{{"terminalSequence":"\\u001b]777;notify;Terax;{event}\\u0007\\u001b]777;notify;Terax;transcript;%s\\u0007"}}' "$__b"; }} || true"#
     )
 }
 
@@ -114,9 +120,12 @@ pub fn agent_claude_hooks_status() -> bool {
     else {
         return false;
     };
+    // Require the transcript marker too, so installs predating it are reported
+    // as not-enabled and get upgraded on the next enable.
     HOOK_EVENTS
         .iter()
         .all(|(_, m)| content.contains(&format!("notify;Terax;{m}")))
+        && content.contains("notify;Terax;transcript;")
 }
 
 #[cfg(test)]
@@ -145,6 +154,9 @@ mod tests {
         assert!(command(&out, "UserPromptSubmit", 0).contains("notify;Terax;working"));
         assert!(command(&out, "Stop", 0).contains("terminalSequence"));
         assert!(!command(&out, "Stop", 0).contains("/dev/tty"));
+        // Each hook also reports the session transcript path for the chat mirror.
+        assert!(command(&out, "UserPromptSubmit", 0).contains("notify;Terax;transcript;"));
+        assert!(command(&out, "UserPromptSubmit", 0).contains("transcript_path"));
     }
 
     #[test]
