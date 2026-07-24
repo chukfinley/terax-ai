@@ -1,4 +1,5 @@
-import { CLI_AGENT_BINS, detectCliAgents } from "../cli";
+import { detectCliAgents } from "../cli/bridge";
+import { CLI_AGENT_BINS } from "../cli/registry";
 import { useEffect, useState } from "react";
 import { firePendingReviewForSession } from "@/modules/agents/lib/review";
 import { usePreferencesStore } from "@/modules/settings/preferences";

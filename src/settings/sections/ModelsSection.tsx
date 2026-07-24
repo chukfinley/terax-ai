@@ -42,7 +42,8 @@ import {
   type SttProvider,
   WHISPERCPP_DEFAULT_BASE_URL,
 } from "@/modules/ai/config";
-import { CLI_AGENTS, detectCliAgents } from "@/modules/ai/cli";
+import { detectCliAgents } from "@/modules/ai/cli/bridge";
+import { CLI_AGENTS } from "@/modules/ai/cli/registry";
 import type { CliPermissionMode } from "@/modules/ai/cli/types";
 import {
   type CustomEndpointKeys,

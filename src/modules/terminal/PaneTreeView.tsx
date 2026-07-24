@@ -5,14 +5,21 @@ import {
 } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 import type { SearchAddon } from "@xterm/addon-search";
-import { Fragment } from "react";
+import { Fragment, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { useAgentStore } from "@/modules/agents/store/agentStore";
-import { ClaudeChatView } from "@/modules/claude-chat/ClaudeChatView";
 import { useChatViewStore } from "@/modules/claude-chat/store/chatViewStore";
 import { BubbleChatIcon, TerminalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useTerminalDropStore } from "./lib/dropStore";
+
+// lazy: the chat mirror drags in the AI SDK, streamdown and CodeMirror. The
+// terminal shell must not pay for that at startup — it loads on first toggle.
+const ClaudeChatView = lazy(() =>
+  import("@/modules/claude-chat/ClaudeChatView").then((m) => ({
+    default: m.ClaudeChatView,
+  })),
+);
 import { firstLeafSlotId, type PaneNode } from "./lib/panes";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import { useTerminalTitleStore } from "./lib/terminalTitleStore";
@@ -166,11 +173,13 @@ function LeafPane({
             )}
             aria-hidden={!chatActive}
           >
-            <ClaudeChatView
-              leafId={leafId}
-              transcriptPath={session?.transcriptPath ?? undefined}
-              active={chatActive && tabVisible}
-            />
+            <Suspense fallback={<div className="h-full w-full bg-background" />}>
+              <ClaudeChatView
+                leafId={leafId}
+                transcriptPath={session?.transcriptPath ?? undefined}
+                active={chatActive && tabVisible}
+              />
+            </Suspense>
           </div>
         ) : null}
       </div>

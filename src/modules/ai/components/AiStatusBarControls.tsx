@@ -58,7 +58,8 @@ import {
   type ModelInfo,
   type ProviderId,
 } from "../config";
-import { CLI_AGENTS, detectCliAgents } from "../cli";
+import { detectCliAgents } from "../cli/bridge";
+import { CLI_AGENTS } from "../cli/registry";
 import { ACCEPTED_FILES, useComposer } from "../lib/composer";
 import { toggleFavoriteModel } from "../lib/modelPrefs";
 import { useChatStore } from "../store/chatStore";
