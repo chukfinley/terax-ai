@@ -83,6 +83,8 @@ export function VideoPlayer({ src, mime }: Props) {
       // Kill the webview's default right-click menu — it looks foreign.
       onContextMenu={(e) => e.preventDefault()}
     >
+      {/* biome-ignore lint/a11y/useMediaCaption: local media file preview —
+          there is no caption track to offer. */}
       <video
         ref={videoRef}
         playsInline

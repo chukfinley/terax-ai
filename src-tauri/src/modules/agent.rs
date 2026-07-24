@@ -201,7 +201,10 @@ fn merge_hooks(mut root: Value, spec: &AgentSpec) -> Value {
 fn existing_config(contents: Option<&str>, path: &std::path::Path) -> Result<Value, String> {
     match contents {
         Some(s) if !s.trim().is_empty() => serde_json::from_str::<Value>(s).map_err(|e| {
-            format!("{} is not valid JSON ({e}); refusing to overwrite", path.display())
+            format!(
+                "{} is not valid JSON ({e}); refusing to overwrite",
+                path.display()
+            )
         }),
         _ => Ok(json!({})),
     }
@@ -351,9 +354,7 @@ pub fn agent_hooks_status(agent: String) -> bool {
     // Require the transcript marker too, so installs predating it are reported
     // as not-enabled and get upgraded on the next enable.
     match spec.delivery {
-        Delivery::TerminalSequence => {
-            status_ok && content.contains("notify;Terax;transcript;")
-        }
+        Delivery::TerminalSequence => status_ok && content.contains("notify;Terax;transcript;"),
         Delivery::Osc => status_ok,
     }
 }

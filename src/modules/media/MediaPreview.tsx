@@ -107,6 +107,8 @@ export const MediaPreview = forwardRef<EditorPaneHandle, Props>(
             <VideoPlayer src={status.src} mime={mime} />
           ) : (
             <div className="w-full max-w-md">
+              {/* biome-ignore lint/a11y/useMediaCaption: local media file
+                  preview — there is no caption track to offer. */}
               <audio src={status.src} controls className="w-full">
                 <source src={status.src} type={mime} />
               </audio>

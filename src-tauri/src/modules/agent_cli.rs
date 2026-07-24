@@ -171,7 +171,11 @@ pub async fn agent_cli_spawn(
 
     let stdout_pipe = child.take_stdout();
     let stderr_pipe = child.take_stderr();
-    state.children.lock().unwrap().insert(id, Arc::clone(&child));
+    state
+        .children
+        .lock()
+        .unwrap()
+        .insert(id, Arc::clone(&child));
 
     if let Some(pipe) = stdout_pipe {
         let ch = on_event.clone();

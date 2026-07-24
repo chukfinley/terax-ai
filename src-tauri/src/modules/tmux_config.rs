@@ -115,7 +115,7 @@ fn split_direction(tokens: &[&str]) -> Option<SplitDir> {
     if !has_split {
         return None;
     }
-    if tokens.iter().any(|t| *t == "-h") {
+    if tokens.contains(&"-h") {
         return Some(SplitDir::Right);
     }
     // `-v` or bare `split-window` both default to a vertical (down) split.
@@ -133,19 +133,22 @@ enum FocusDir {
 /// direction from `-L/-R/-U/-D`. Directionless `select-pane` (e.g. `-t`) is
 /// ignored.
 fn select_pane_direction(tokens: &[&str]) -> Option<FocusDir> {
-    if !tokens.iter().any(|t| *t == "select-pane" || *t == "selectp") {
+    if !tokens
+        .iter()
+        .any(|t| *t == "select-pane" || *t == "selectp")
+    {
         return None;
     }
-    if tokens.iter().any(|t| *t == "-L") {
+    if tokens.contains(&"-L") {
         return Some(FocusDir::Left);
     }
-    if tokens.iter().any(|t| *t == "-R") {
+    if tokens.contains(&"-R") {
         return Some(FocusDir::Right);
     }
-    if tokens.iter().any(|t| *t == "-U") {
+    if tokens.contains(&"-U") {
         return Some(FocusDir::Up);
     }
-    if tokens.iter().any(|t| *t == "-D") {
+    if tokens.contains(&"-D") {
         return Some(FocusDir::Down);
     }
     None
@@ -278,12 +281,22 @@ fn build_bindings(enabled: bool, prefix: PrefixKey, b: ParsedBindings) -> TmuxSp
     TmuxSplitBindings {
         enabled,
         prefix,
-        split_right: b.split_right.unwrap_or_else(|| DEFAULT_SPLIT_RIGHT.to_string()),
-        split_down: b.split_down.unwrap_or_else(|| DEFAULT_SPLIT_DOWN.to_string()),
-        focus_left: b.focus_left.unwrap_or_else(|| DEFAULT_FOCUS_LEFT.to_string()),
-        focus_right: b.focus_right.unwrap_or_else(|| DEFAULT_FOCUS_RIGHT.to_string()),
+        split_right: b
+            .split_right
+            .unwrap_or_else(|| DEFAULT_SPLIT_RIGHT.to_string()),
+        split_down: b
+            .split_down
+            .unwrap_or_else(|| DEFAULT_SPLIT_DOWN.to_string()),
+        focus_left: b
+            .focus_left
+            .unwrap_or_else(|| DEFAULT_FOCUS_LEFT.to_string()),
+        focus_right: b
+            .focus_right
+            .unwrap_or_else(|| DEFAULT_FOCUS_RIGHT.to_string()),
         focus_up: b.focus_up.unwrap_or_else(|| DEFAULT_FOCUS_UP.to_string()),
-        focus_down: b.focus_down.unwrap_or_else(|| DEFAULT_FOCUS_DOWN.to_string()),
+        focus_down: b
+            .focus_down
+            .unwrap_or_else(|| DEFAULT_FOCUS_DOWN.to_string()),
     }
 }
 

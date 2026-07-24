@@ -6,7 +6,7 @@ use serde::Serialize;
 use tauri::Emitter;
 use tempfile::NamedTempFile;
 
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 use crate::modules::workspace::{resolve_path, WorkspaceEnv};
 
@@ -108,18 +108,15 @@ fn read_file_sync(p: &Path, force: bool) -> Result<ReadResult, String> {
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum ReadMediaResult {
-    Ok {
-        data: String,
-        size: u64,
-    },
-    TooLarge {
-        size: u64,
-        limit: u64,
-    },
+    Ok { data: String, size: u64 },
+    TooLarge { size: u64, limit: u64 },
 }
 
 #[tauri::command]
-pub fn fs_read_media(path: String, workspace: Option<WorkspaceEnv>) -> Result<ReadMediaResult, String> {
+pub fn fs_read_media(
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+) -> Result<ReadMediaResult, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     let p = resolve_path(&path, &workspace);
     let meta = std::fs::metadata(&p).map_err(|e| {
@@ -187,9 +184,7 @@ pub async fn fs_write_file(
     if let Some(perms) = original_permissions {
         let _ = fs::set_permissions(&target, perms);
     }
-    let mtime = fs::metadata(&target)
-        .map(|m| mtime_millis(&m))
-        .unwrap_or(0);
+    let mtime = fs::metadata(&target).map(|m| mtime_millis(&m)).unwrap_or(0);
     let _ = app.emit(
         "fs:file-written",
         FileWrittenEvent {

@@ -733,7 +733,10 @@ mod windows {
         let unc_root = crate::modules::workspace::wsl_path_to_unc(distro, &linux_root);
         fs::create_dir_all(&unc_root).map_err(|e| format!("create {}: {e}", unc_root.display()))?;
         write_if_changed(&unc_root.join("img.sh"), &normalize_script(super::IMG_SH))?;
-        write_if_changed(&unc_root.join("img.fish"), &normalize_script(super::IMG_FISH))?;
+        write_if_changed(
+            &unc_root.join("img.fish"),
+            &normalize_script(super::IMG_FISH),
+        )?;
         write_if_changed(&unc_root.join("img.ps1"), &normalize_script(super::IMG_PS1))?;
         Ok(())
     }

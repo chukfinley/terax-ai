@@ -85,7 +85,10 @@ pub fn media_stream_url(path: String, workspace: Option<WorkspaceEnv>) -> Result
     }
     let srv = ensure_server().ok_or("media server unavailable")?;
     let enc = pct_encode(&canon.to_string_lossy());
-    Ok(format!("http://127.0.0.1:{}/{}/{}", srv.port, srv.token, enc))
+    Ok(format!(
+        "http://127.0.0.1:{}/{}/{}",
+        srv.port, srv.token, enc
+    ))
 }
 
 fn serve(stream: TcpStream, token: &str) -> std::io::Result<()> {
@@ -154,13 +157,20 @@ fn serve(stream: TcpStream, token: &str) -> std::io::Result<()> {
     };
     let length = if size == 0 { 0 } else { end - start + 1 };
 
-    let reason = if status == 206 { "Partial Content" } else { "OK" };
+    let reason = if status == 206 {
+        "Partial Content"
+    } else {
+        "OK"
+    };
     let mut head = format!("HTTP/1.1 {} {}\r\n", status, reason);
     head.push_str(&format!("Content-Type: {}\r\n", ctype));
     head.push_str("Accept-Ranges: bytes\r\n");
     head.push_str(&format!("Content-Length: {}\r\n", length));
     if status == 206 {
-        head.push_str(&format!("Content-Range: bytes {}-{}/{}\r\n", start, end, size));
+        head.push_str(&format!(
+            "Content-Range: bytes {}-{}/{}\r\n",
+            start, end, size
+        ));
     }
     head.push_str("Cache-Control: no-store\r\n");
     head.push_str("Connection: close\r\n\r\n");

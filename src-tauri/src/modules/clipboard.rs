@@ -48,7 +48,8 @@ fn read_image_blocking() -> Result<Option<String>, String> {
         Err(_) => return Ok(None),
     };
 
-    let width = u32::try_from(img.width).map_err(|_| "clipboard image width overflow".to_string())?;
+    let width =
+        u32::try_from(img.width).map_err(|_| "clipboard image width overflow".to_string())?;
     let height =
         u32::try_from(img.height).map_err(|_| "clipboard image height overflow".to_string())?;
     if width == 0 || height == 0 {
@@ -78,13 +79,19 @@ fn cleanup_blocking() -> u32 {
     };
     for entry in entries.flatten() {
         let name_os = entry.file_name();
-        let Some(name) = name_os.to_str() else { continue };
+        let Some(name) = name_os.to_str() else {
+            continue;
+        };
         if !name.starts_with(FILE_PREFIX) || !name.ends_with(FILE_SUFFIX) {
             continue;
         }
         let Ok(meta) = entry.metadata() else { continue };
-        let Ok(modified) = meta.modified() else { continue };
-        let Ok(age) = now.duration_since(modified) else { continue };
+        let Ok(modified) = meta.modified() else {
+            continue;
+        };
+        let Ok(age) = now.duration_since(modified) else {
+            continue;
+        };
         if age.as_secs() <= CLEANUP_AGE_SECS {
             continue;
         }
@@ -137,7 +144,9 @@ mod tests {
 
     #[test]
     fn encode_rgba_round_trip() {
-        let rgba = vec![255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255];
+        let rgba = vec![
+            255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+        ];
         let png = encode_rgba_to_png(&rgba, 2, 2).expect("encode");
         assert!(png.starts_with(&[0x89, 0x50, 0x4E, 0x47]), "PNG signature");
     }

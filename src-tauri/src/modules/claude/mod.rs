@@ -171,9 +171,11 @@ pub fn claude_transcript_subscribe(
                     Ok(()) => {
                         // Drain the debounce window so a burst is one read.
                         let deadline = Instant::now() + DEBOUNCE;
-                        while rx.recv_timeout(DEBOUNCE.min(
-                            deadline.saturating_duration_since(Instant::now()),
-                        )).is_ok()
+                        while rx
+                            .recv_timeout(
+                                DEBOUNCE.min(deadline.saturating_duration_since(Instant::now())),
+                            )
+                            .is_ok()
                         {
                             if Instant::now() >= deadline {
                                 break;
@@ -204,11 +206,13 @@ pub fn claude_transcript_subscribe(
         })
         .map_err(|e| e.to_string())?;
 
-    state
-        .tails
-        .lock()
-        .unwrap()
-        .insert(key, TailHandle { stop, _watcher: watcher });
+    state.tails.lock().unwrap().insert(
+        key,
+        TailHandle {
+            stop,
+            _watcher: watcher,
+        },
+    );
     Ok(())
 }
 
@@ -232,7 +236,10 @@ mod tests {
 
     #[test]
     fn encodes_project_dir_like_claude() {
-        assert_eq!(encode_project_dir("/home/user/git/terax-ai"), "-home-user-git-terax-ai");
+        assert_eq!(
+            encode_project_dir("/home/user/git/terax-ai"),
+            "-home-user-git-terax-ai"
+        );
         assert_eq!(
             encode_project_dir("/home/user/.claude/mem/observer/sessions"),
             "-home-user--claude-mem-observer-sessions"
@@ -254,7 +261,10 @@ mod tests {
         assert_eq!(out, "{\"a\":1}\n{\"b\":2}\n");
 
         // Partial trailing line is not consumed; completing it emits it next.
-        let mut f = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap();
         writeln!(f, "ial\":3}}").unwrap();
         f.flush().unwrap();
         let out2 = read_appended(&path, &mut offset).unwrap();
